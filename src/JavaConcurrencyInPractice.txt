@@ -1,0 +1,1520 @@
+Since threads share the memory address
+space of their owning process, all threads within a process have access to the same
+variables and allocate objects from the same heap, which allows finer-grained data
+sharing than inter-process mechanisms.
+
+
+Every Java application uses threads. When the JVM starts, it creates threads
+for JVM housekeeping tasks (garbage collection, finalization) and a main thread
+for running the main method. The AWT (Abstract Window Toolkit) and Swing
+user interface frameworks create threads for managing user interface events. Timer
+creates threads for executing deferred tasks. Component frameworks, such as
+servlets and RMI create pools of threads and invoke component methods in these
+threads.
+
+Frameworks introduce concurrency into applications by calling application
+components from framework threads. Components invariably access
+application state, thus requiring that all code paths accessing that state
+be thread-safe.
+
+building concurrent programs require the correct use of threads
+and locks. But these are just mechanisms—means to an end. Writing thread-safe
+code is, at its core, about managing access to state, and in particular to shared,
+mutable state.
+
+
+2. Thead safe
+
+Writing thread-safe code is, at its core, about managing access to state, and in particular to shared,
+mutable state.
+
+Informally, an object’s state is its data, stored in state variables such as instance
+or static fields.
+
+Whenever more than one thread accesses a given state variable, and one of them might
+write to it, they all must coordinate their access to it using synchronization.The primary
+mechanism for synchronization in Java is the synchronized keyword, which provides
+exclusive locking, but the term “synchronization” also includes the use of
+volatile variables, explicit locks, and atomic variables.
+
+If multiple threads access the same mutable state variable without appropriate
+synchronization, your program is broken. There are three ways to
+fix it:
+• Don’t share the state variable across threads;
+• Make the state variable immutable; or
+• Use synchronization whenever accessing the state variable.
+
+When designing thread-safe classes, good object-oriented techniques—
+encapsulation, immutability, and clear specification of invariants—are
+your best friends.
+
+Thread
+safety may be a term that is applied to code, but it is about state, and it can only
+be applied to the entire body of code that encapsulates its state, which may be an
+object or an entire program.
+
+At the heart of any reasonable definition of thread safety is the concept of
+correctness.
+
+!!! A class is thread-safe if it behaves correctly when accessed from multiple
+threads, regardless of the scheduling or interleaving of the execution of
+those threads by the runtime environment, and with no additional synchronization
+or other coordination on the part of the calling code.
+
+!!! Thread-safe classes encapsulate any needed synchronization so that
+clients need not provide their own.
+
+!!! Stateless objects are always thread-safe.
+
+
+The
+possibility of incorrect results in the presence of unlucky timing is so important
+in concurrent programming that it has a name: a race condition.
+
+A race condition occurs when the correctness of a computation depends
+on the relative timing or interleaving of multiple threads by the runtime; in other
+words, when getting the right answer relies on lucky timing.4 The most common
+type of race condition is check-then-act, where a potentially stale observation is
+used to make a decision on what to do next.
+
+
+This type of race condition
+is called check-then-act: you observe something to be true (file X doesn’t
+exist) and then take action based on that observation (create X); but in fact the
+observation could have become invalid between the time you observed it and the
+time you acted on it (someone else created X in the meantime), causing a problem
+(unexpected exception, overwritten data, file corruption).
+
+
+Operations A and B are atomic with respect to each other if, from the
+perspective of a thread executing A, when another thread executes B,
+either all of B has executed or none of it has. An atomic operation is one
+that is atomic with respect to all operations, including itself, that operate
+on the same state.
+
+To ensure thread safety, check-then-act operations (like lazy initialization)
+and read-modify-write operations (like increment) must always be atomic.
+We refer collectively to check-then-act and read-modify-write sequences as compound
+actions: sequences of operations that must be executed atomically in order
+to remain thread-safe.In the next section, we’ll consider locking, Java’s builtin
+mechanism for ensuring atomicity.
+
+
+To preserve state consistency, update related state variables in a single
+atomic operation.
+
+
+Intrinsic locks
+Java provides a built-in locking mechanism for enforcing atomicity: the synchronized
+block. (There is also another critical aspect to locking and other synchronization
+mechanisms—visibility—which is covered in Chapter 3.) A synchronized
+block has two parts: a reference to an object that will serve as the lock, and a
+block of code to be guarded by that lock. A synchronized method is a shorthand
+for a synchronized block that spans an entire method body, and whose lock is
+the object on which the method is being invoked. (Static synchronized methods
+use the Class object for the lock.)
+
+Every Java object can implicitly act as a lock for purposes of synchronization;
+these built-in locks are called intrinsic locks or monitor locks. The lock is automatically
+acquired by the executing thread before entering a synchronized block
+and automatically released when control exits the synchronized block, whether
+by the normal control path or by throwing an exception out of the block. The
+only way to acquire an intrinsic lock is to enter a synchronized block or method
+guarded by that lock.
+Intrinsic locks in Java act as mutexes (or mutual exclusion locks), which means
+that at most one thread may own the lock. When thread A attempts to acquire a
+lock held by thread B, A must wait, or block, until B releases it. If B never releases
+the lock, A waits forever.
+
+clearer in Section 3.1.)
+
+Compound actions on shared state, such as incrementing a hit counter (readmodify-
+write) or lazy initialization (check-then-act), must be made atomic to
+avoid race conditions. Holding a lock for the entire duration of a compound action
+can make that compound action atomic. However, just wrapping the compound
+action with a synchronized block is not sufficient; if synchronization is used to
+coordinate access to a variable, it is needed everywhere that variable is accessed. Further,
+when using locks to coordinate access to a variable, the same lock must be
+used wherever that variable is accessed.
+
+It is a common mistake to assume that synchronization needs to be used only
+when writing to shared variables; this is simply not true.
+
+For each mutable state variable that may be accessed by more than one
+thread, all accesses to that variable must be performed with the same
+lock held. In this case, we say that the variable is guarded by that lock.
+
+There is no inherent relationship between an object’s intrinsic lock and its
+state; an object’s fields need not be guarded by its intrinsic lock, though this is
+a perfectly valid locking convention that is used by many classes. Acquiring the
+lock associated with an object does not prevent other threads from accessing that
+object—the only thing that acquiring a lock prevents any other thread from doing
+is acquiring that same lock. The fact that every object has a built-in lock is just a
+convenience so that you needn’t explicitly create lock objects.9 It is up to you to
+construct locking protocols or synchronization policies that let you access shared state
+safely, and to use them consistently throughout your program.
+
+Every shared, mutable variable should be guarded by exactly one lock.
+Make it clear to maintainers which lock that is.
+
+Not all data needs to be guarded by locks—only mutable data that will be
+accessed from multiple threads.
+
+When a variable is guarded by a lock—meaning that every access to that variable
+is performed with that lock held—you’ve ensured that only one thread at a
+time can access that variable. When a class has invariants that involve more than
+one state variable, there is an additional requirement: each variable participating
+in the invariant must be guarded by the same lock. This allows you to access or
+update them in a single atomic operation, preserving the invariant.
+
+You should be careful not to make the scope
+of the synchronized block too small; you would not want to divide an operation
+that should be atomic into more than one synchronized block. But it is reasonable
+to try to exclude from synchronized blocks long-running operations that do
+not affect shared state, so that other threads are not prevented from accessing the
+shared state while the long-running operation is in progress.
+
+For every invariant that involves more than one variable, all the variables
+involved in that invariant must be guarded by the same lock.
+
+Because these
+counters constitute shared mutable state as well, we must use synchronization
+everywhere they are accessed. The portions of code that are outside the synchronized
+blocks operate exclusively on local (stack-based) variables, which are not
+2.5. Liveness and performance 31
+shared across threads and therefore do not require synchronization.
+
+
+Atomic variables are useful
+for effecting atomic operations on a single variable, but since we are already using
+synchronized blocks to construct atomic operations, using two different synchronization
+mechanisms would be confusing and would offer no performance or
+safety benefit.
+
+
+
+
+
+For each mutable state variable that may be accessed by more than one
+thread, all accesses to that variable must be performed with the same
+lock held. In this case, we say that the variable is guarded by that lock.
+
+3.
+
+We stated at the beginning of Chapter 2 that writing correct concurrent programs
+is primarily about managing access to shared, mutable state. That chapter was
+about using synchronization to prevent multiple threads from accessing the same
+data at the same time; this chapter examines techniques for sharing and publishing
+objects so they can be safely accessed by multiple threads. Together, they lay
+the foundation for building thread-safe classes and safely structuring concurrent
+applications using the java.util.concurrent library classes.
+
+
+We have seen how synchronized blocks and methods can ensure that operations
+execute atomically, but it is a common misconception that synchronized
+is only about atomicity or demarcating “critical sections”. Synchronization also
+has another significant, and subtle, aspect: memory visibility.
+
+In order to ensure visibility of memory
+writes across threads, you must use synchronization.
+
+
+In the absence of synchronization, the compiler, processor, and runtime
+can do some downright weird things to the order in which operations appear
+to execute. Attempts to reason about the order in which memory
+actions “must” happen in insufficiently synchronized multithreaded programs
+will almost certainly be incorrect.
+
+Fortunately, there’s an easy
+way to avoid these complex issues: always use the proper synchronization whenever
+data is shared across threads.
+
+Unless synchronization is used every time
+a variable is accessed, it is possible to see a stale value for that variable. Worse, staleness
+is not all-or-nothing: a thread can see an up-to-date value of one variable
+but a stale value of another variable that was written first.
+
+
+3.1.2 Nonatomic 64-bit operations
+When a thread reads a variable without synchronization, it may see a stale value,
+but at least it sees a value that was actually placed there by some thread rather
+than some random value. This safety guarantee is called out-of-thin-air safety.
+Out-of-thin-air safety applies to all variables, with one exception: 64-bit numeric
+variables (double and long) that are not declared volatile (see Section
+3.1.4). The Java Memory Model requires fetch and store operations to be atomic,
+but for nonvolatile long and double variables, the JVM is permitted to treat a
+64-bit read or write as two separate 32-bit operations. If the reads and writes
+occur in different threads, it is therefore possible to read a nonvolatile long and
+get back the high 32 bits of one value and the low 32 bits of another.3 Thus, even
+if you don’t care about stale values, it is not safe to use shared mutable long and
+double variables in multithreaded programs unless they are declared volatile
+or guarded by a lock.
+
+3.1.3 Locking and visibility
+Intrinsic locking can be used to guarantee that one thread sees the effects of another
+in a predictable manner, as illustrated by Figure 3.1.
+In other words, everything A did in or prior to a synchronized block is
+visible to B when it executes a synchronized block guarded by the same lock.
+Without synchronization, there is no such guarantee.
+
+We can now give the other reason for the rule requiring all threads to synchronize
+on the same lock when accessing a shared mutable variable—to guarantee
+that values written by one thread are made visible to other threads. Otherwise,
+if a thread reads a variable without holding the appropriate lock, it might see a
+stale value.
+
+Locking is not just about mutual exclusion; it is also about memory visibility.
+To ensure that all threads see the most up-to-date values of shared
+mutable variables, the reading and writing threads must synchronize on
+a common lock.
+
+3.1.4 Volatile variables
+
+The Java language also provides an alternative, weaker form of synchronization,
+volatile variables, to ensure that updates to a variable are propagated predictably
+to other threads.
+When a field is declared volatile, the compiler and runtime
+are put on notice that this variable is shared and that operations on it should not
+be reordered with other memory operations. Volatile variables are not cached in
+registers or in caches where they are hidden from other processors, so a read of a
+volatile variable always returns the most recent write by any thread.
+
+Yet accessing a
+volatile variable performs no locking and so cannot cause the executing thread
+to block, making volatile variables a lighter-weight synchronization mechanism
+than synchronized.5
+
+The visibility effects of volatile variables extend beyond the value of the
+volatile variable itself. When thread A writes to a volatile variable and subsequently
+thread B reads that same variable, the values of all variables that were
+visible to A prior to writing to the volatile variable become visible to B after
+reading the volatile variable. So from a memory visibility perspective, writing
+a volatile variable is like exiting a synchronized block and reading a volatile
+variable is like entering a synchronized block. However, we do not recommend
+relying too heavily on volatile variables for visibility; code that relies on volatile
+variables for visibility of arbitrary state is more fragile and harder to understand
+than code that uses locking.
+
+Use volatile variables only when they simplify implementing and verifying
+your synchronization policy; avoid using volatile variables when
+veryfing correctness would require subtle reasoning about visibility. Good
+uses of volatile variables include ensuring the visibility of their own
+state, that of the object they refer to, or indicating that an important lifecycle
+event (such as initialization or shutdown) has occurred.
+
+Volatile variables are convenient, but they have limitations. The most common
+use for volatile variables is as a completion, interruption, or status flag, such as
+the asleep flag in Listing 3.4. Volatile variables can be used for other kinds of
+state information, but more care is required when attempting this. For example,
+the semantics of volatile are not strong enough to make the increment operation
+(count++) atomic, unless you can guarantee that the variable is written only from
+a single thread. (Atomic variables do provide atomic read-modify-write support
+and can often be used as “better volatile variables”; see Chapter 15.)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Locking can guarantee both visibility and atomicity; volatile variables can
+only guarantee visibility.
+
+
+You can use volatile variables only when all the following criteria are met:
+• Writes to the variable do not depend on its current value, or you can ensure
+that only a single thread ever updates the value;
+• The variable does not participate in invariants with other state variables;
+and
+• Locking is not required for any other reason while the variable is being
+accessed.
+
+
+3.2 Publication and escape
+
+3.2.1 Safe construction practices
+
+But an object is in a predictable,
+consistent state only after its constructor returns, so publishing an object
+from within its constructor can publish an incompletely constructed object. This is
+true even if the publication is the last statement in the constructor. If the this reference
+escapes during construction, the object is considered not properly constructed.
+
+Do not allow the this reference to escape during construction.
+
+
+A common mistake that can let the this reference escape during construction
+is to start a thread from a constructor. When an object creates a thread from its
+constructor, it almost always shares its this reference with the new thread, either
+explicitly (by passing it to the constructor) or implicitly.The new thread might then be
+able to see the owning object before it is fully constructed. There’s nothing wrong
+with creating a thread in a constructor, but it is best not to start the thread immediately.
+Instead, expose a start or initialize method that starts the owned thread.
+
+If you are tempted to register an event listener or start a thread from a constructor,
+you can avoid the improper construction by using a private constructor
+and a public factory method.
+
+
+3.3 Thread confinement
+
+Accessing shared, mutable data requires using synchronization; one way to avoid
+this requirement is to not share. If data is only accessed from a single thread,
+no synchronization is needed. This technique, thread confinement, is one of the
+simplest ways to achieve thread safety. When an object is confined to a thread,
+such usage is automatically thread-safe even if the confined object itself is not.
+
+Just as the language has no mechanism for enforcing that a variable is guarded
+by a lock, it has no means of confining an object to a thread. Thread confinement is
+an element of your program’s design that must be enforced by its implementation.
+The language and core libraries provide mechanisms that can help in maintaining
+thread confinement—local variables and the ThreadLocal class—but even with
+these, it is still the programmer’s responsibility to ensure that thread-confined
+objects do not escape from their intended thread.
+
+3.3.1 Ad-hoc thread confinement
+Ad-hoc thread confinement describes when the responsibility for maintaining thread
+confinement falls entirely on the implementation. Ad-hoc thread confinement can
+be fragile because none of the language features, such as visibility modifiers or
+local variables, helps confine the object to the target thread.
+
+A special case of thread confinement applies to volatile variables. It is safe to
+perform read-modify-write operations on shared volatile variables as long as you
+ensure that the volatile variable is only written from a single thread. In this case,
+you are confining the modification to a single thread to prevent race conditions,
+and the visibility guarantees for volatile variables ensure that other threads see
+the most up-to-date value.
+Because of its fragility, ad-hoc thread confinement should be used sparingly;
+if possible, use one of the stronger forms of thread confinment (stack confinement
+or ThreadLocal) instead.
+
+3.3.2 Stack confinement
+Stack confinement is a special case of thread confinement in which an object can
+only be reached through local variables. Just as encapsulation can make it easier
+to preserve invariants, local variables can make it easier to confine objects to a
+thread. Local variables are intrinsically confined to the executing thread; they exist
+on the executing thread’s stack, which is not accessible to other threads. Stack
+confinement (also called within-thread or thread-local usage, but not to be confused
+with the ThreadLocal library class) is simpler to maintain and less fragile than
+ad-hoc thread confinement.
+
+There is no way to
+obtain a reference to a primitive variable, so the language semantics ensure that
+primitive local variables are always stack confined.
+
+
+3.3.3 ThreadLocal
+
+A more formal means of maintaining thread confinement is ThreadLocal, which
+allows you to associate a per-thread value with a value-holding object. Thread-
+Local provides get and set accessor methods that maintain a separate copy of the
+value for each thread that uses it, so a get returns the most recent value passed
+to set from the currently executing thread.
+Thread-local variables are often used to prevent sharing in designs based on
+mutable Singletons or global variables. For example, a single-threaded application
+might maintain a global database connection that is initialized at startup to
+avoid having to pass a Connection to every method. Since JDBC connections
+may not be thread-safe, a multithreaded application that uses a global connection
+without additional coordination is not thread-safe either.
+
+
+3.4 Immutability
+
+The other end-run around the need to synchronize is to use immutable objects
+[EJ Item 13]. Nearly all the atomicity and visibility hazards we’ve described so
+far, such as seeing stale values, losing updates, or observing an object to be in
+an inconsistent state, have to do with the vagaries of multiple threads trying to
+access the same mutable state at the same time. If an object’s state cannot be
+modified, these risks and complexities simply go away.
+An immutable object is one whose state cannot be changed after construction.
+Immutable objects are inherently thread-safe; their invariants are established by
+the constructor, and if their state cannot be changed, these invariants always hold.
+
+
+Immutable objects are simple. They can only be in one state, which is carefully
+controlled by the constructor. One of the most difficult elements of program
+design is reasoning about the possible states of complex objects. Reasoning about
+the state of immutable objects, on the other hand, is trivial.
+
+Neither the Java Language Specification nor the Java Memory Model formally
+defines immutability, but immutability is not equivalent to simply declaring all
+fields of an object final. An object whose fields are all final may still be mutable,
+since final fields can hold references to mutable objects.
+An object is immutable if:
+• Its state cannot be modified after construction;
+• All its fields are final;12 and
+• It is properly constructed (the this reference does not escape during
+construction).
+
+Immutable objects can still use mutable objects internally to manage their
+state.
+
+Because program state changes all the time, you might be tempted to think
+that immutable objects are of limited use, but this is not the case. There is a
+difference between an object being immutable and the reference to it being immutable.
+Program state stored in immutable objects can still be updated by “replacing” immutable
+objects with a new instance holding new state; the next section offers an
+example of this technique.
+
+
+3.4.1 Final fields
+
+The final keyword, a more limited version of the const mechanism from C++,
+supports the construction of immutable objects. Final fields can’t be modified (although
+the objects they refer to can be modified if they are mutable), but they also
+have special semantics under the Java Memory Model. It is the use of final fields
+that makes possible the guarantee of initialization safety (see Section 3.5.2) that lets
+immutable objects be freely accessed and shared without synchronization.
+Even if an object is mutable, making some fields final can still simplify reasoning
+about its state, since limiting the mutability of an object restricts its set of
+possible states. An object that is “mostly immutable” but has one or two mutable
+state variables is still simpler than one that has many mutable variables. Declaring
+fields final also documents to maintainers that these fields are not expected
+to change.
+Just as it is a good practice to make all fields private unless they need
+greater visibility [EJ Item 12], it is a good practice to make all fields final
+unless they need to be mutable.
+
+
+Race conditions in accessing or updating multiple related variables can be
+eliminated by using an immutable object to hold all the variables. With a mutable
+holder object, you would have to use locking to ensure atomicity; with an immutable
+one, once a thread acquires a reference to it, it need never worry about
+another thread modifying its state. If the variables are to be updated, a new
+holder object is created, but any threads working with the previous holder still
+see it in a consistent state.
+
+The cache-related operations cannot interfere with each other because One-
+ValueCache is immutable and the cache field is accessed only once in each of
+the relevant code paths. This combination of an immutable holder object for
+multiple state variables related by an invariant, and a volatile reference used to
+ensure its timely visibility, allows VolatileCachedFactorizer to be thread-safe
+even though it does no explicit locking.
+
+3.5 Safe publication
+
+
+
+5.4 Blocking and interruptible methods
+
+Interruption is a cooperative mechanism. One thread cannot force another to
+stop what it is doing and do something else; when thread A interrupts thread B, A
+is merely requesting that B stop what it is doing when it gets to a convenient stopping
+point—if it feels like it.
+
+The put and take methods of BlockingQueue throw the checked InterruptedException,
+as do a number of other library methods such as Thread.sleep.
+When a method can throw InterruptedException, it is telling you that it is a
+blocking method, and further that if it is interrupted, it will make an effort to stop
+blocking early.
+
+When your code calls a method that throws InterruptedException, then your
+method is a blocking method too, and must have a plan for responding to interruption.
+For library code, there are basically two choices:
+Propagate the InterruptedException. This is often the most sensible policy if
+you can get away with it—just propagate the InterruptedException to your
+caller. This could involve not catching InterruptedException, or catching it
+and throwing it again after performing some brief activity-specific cleanup.
+Restore the interrupt. Sometimes you cannot throw InterruptedException, for
+instance when your code is part of a Runnable. In these situations, you must
+catch InterruptedException and restore the interrupted status by calling
+interrupt on the current thread, so that code higher up the call stack can
+see that an interrupt was issued, as demonstrated in Listing 5.10.
+
+
+You can get much more sophisticated with interruption, but these two approaches
+should work in the vast majority of situations. But there is one thing
+you should not do with InterruptedException—catch it and do nothing in response.
+This deprives code higher up on the call stack of the opportunity to act on
+the interruption, because the evidence that the thread was interrupted is lost. The
+only situation in which it is acceptable to swallow an interrupt is when you are extending
+Thread and therefore control all the code higher up on the call stack.
+
+
+5.5 Synchronizers
+
+
+Blocking queues are unique among the collections classes: not only do they act as
+containers for objects, but they can also coordinate the control flow of producer
+and consumer threads because take and put block until the queue enters the
+desired state (not empty or not full).
+A synchronizer is any object that coordinates the control flow of threads based
+on its state. Blocking queues can act as synchronizers; other types of synchronizers
+include semaphores, barriers, and latches.
+
+All synchronizers share certain structural properties: they encapsulate state
+that determines whether threads arriving at the synchronizer should be allowed
+to pass or forced to wait, provide methods to manipulate that state, and provide
+methods to wait efficiently for the synchronizer to enter the desired state.
+
+
+5.5.1 Latches
+
+A latch is a synchronizer that can delay the progress of threads until it reaches
+its terminal state [CPJ 3.4.2]. A latch acts as a gate: until the latch reaches the
+terminal state the gate is closed and no thread can pass, and in the terminal
+state the gate opens, allowing all threads to pass. Once the latch reaches the
+terminal state, it cannot change state again, so it remains open forever. Latches
+can be used to ensure that certain activities do not proceed until other one-time
+activities complete, such as:
+
+Ensuring that a computation does not proceed until resources it needs have
+been initialized. A simple binary (two-state) latch could be used to indicate
+“Resource R has been initialized”, and any activity that requires R would
+wait first on this latch.
+Ensuring that a service does not start until other services on which it depends
+have started. Each service would have an associated binary latch;
+starting service S would involve first waiting on the latches for other services
+on which S depends, and then releasing the S latch after startup completes
+so any services that depend on S can then proceed.
+• Waiting until all the parties involved in an activity, for instance the players
+in a multi-player game, are ready to proceed. In this case, the latch reaches
+the terminal state after all the players are ready.
+
+CountDownLatch is a flexible latch implementation that can be used in any of
+these situations; it allows one or more threads to wait for a set of events to occur.
+The latch state consists of a counter initialized to a positive number, representing
+the number of events to wait for. The countDown method decrements the counter,
+indicating that an event has occurred, and the await methods wait for the counter
+to reach zero, which happens when all the events have occurred. If the counter is
+nonzero on entry, await blocks until the counter reaches zero, the waiting thread
+is interrupted, or the wait times out.
+
+
+5.5.2 FutureTask
+
+FutureTask also acts like a latch. (FutureTask implements Future, which describes
+an abstract result-bearing computation [CPJ 4.3.3].) A computation represented
+by a FutureTask is implemented with a Callable, the result-bearing
+equivalent of Runnable, and can be in one of three states: waiting to run, running,
+or completed. Completion subsumes all the ways a computation can complete,
+including normal completion, cancellation, and exception. Once a FutureTask
+enters the completed state, it stays in that state forever.
+
+The behavior of Future.get depends on the state of the task. If it is completed,
+get returns the result immediately, and otherwise blocks until the task transitions
+to the completed state and then returns the result or throws an exception. FutureTask
+conveys the result from the thread executing the computation to the
+thread(s) retrieving the result; the specification of FutureTask guarantees that
+this transfer constitutes a safe publication of the result.
+
+FutureTask is used by the Executor framework to represent asynchronous
+tasks, and can also be used to represent any potentially lengthy computation that
+can be started before the results are needed.
+
+5.5.3 Semaphores
+Counting semaphores are used to control the number of activities that can access a
+certain resource or perform a given action at the same time [CPJ 3.4.1]. Counting
+semaphores can be used to implement resource pools or to impose a bound on a
+collection.
+
+
+A Semaphore manages a set of virtual permits; the initial number of permits is
+passed to the Semaphore constructor. Activities can acquire permits (as long as
+some remain) and release permits when they are done with them. If no permit is
+available, acquire blocks until one is (or until interrupted or the operation times
+out). The release method returns a permit to the semaphore.
+A degenerate case of a counting semaphore is a binary semaphore, a Semaphore with an initial count
+of one. A binary semaphore can be used as a mutex with nonreentrant locking
+semantics; whoever holds the sole permit holds the mutex
+
+Semaphores are useful for implementing resource pools such as database connection
+pools. While it is easy to construct a fixed-sized pool that fails if you
+request a resource from an empty pool, what you really want is to block if the
+pool is empty and unblock when it becomes nonempty again. If you initialize
+a Semaphore to the pool size, acquire a permit before trying to fetch a resource
+from the pool, and release the permit after putting a resource back in the pool,
+acquire blocks until the pool becomes nonempty.
+
+
+5.5.4 Barriers
+We have seen how latches can facilitate starting a group of related activities or
+waiting for a group of related activities to complete. Latches are single-use objects;
+once a latch enters the terminal state, it cannot be reset.
+Barriers are similar to latches in that they block a group of threads until some
+event has occurred [CPJ 4.4.3]. The key difference is that with a barrier, all the
+threads must come together at a barrier point at the same time in order to proceed.
+Latches are for waiting for events; barriers are for waiting for other threads.
+
+
+Another form of barrier is Exchanger, a two-party barrier in which the parties
+exchange data at the barrier point [CPJ 3.4.3]. Exchangers are useful when the
+parties perform asymmetric activities, for example when one thread fills a buffer
+with data and the other thread consumes the data from the buffer; these threads
+could use an Exchanger to meet and exchange a full buffer for an empty one.
+When two threads exchange objects via an Exchanger, the exchange constitutes a
+safe publication of both objects to the other party.
+
+
+
+Chapter 6
+Task Execution
+
+
+6.1 Executing tasks in threads
+
+The first step in organizing a program around task execution is identifying sensible
+task boundaries. Ideally, tasks are independent activities: work that doesn’t
+depend on the state, result, or side effects of other tasks. Independence facilitates
+concurrency, as independent tasks can be executed in parallel if there are
+adequate processing resources. For greater flexibility in scheduling and load balancing
+tasks, each task should also represent a small fraction of your application’s
+processing capacity.
+
+
+6.1.2 Explicitly creating threads for tasks
+
+Under light to moderate load, the thread-per-task approach is an improvement
+over sequential execution. As long as the request arrival rate does not exceed the
+server’s capacity to handle requests, this approach offers better responsiveness
+and throughput.
+
+6.1.3 Disadvantages of unbounded thread creation
+
+
+Thread lifecycle overhead. Thread creation and teardown are not free. The actual
+overhead varies across platforms, but thread creation takes time, introducing
+latency into request processing, and requires some processing activity
+by the JVM and OS. If requests are frequent and lightweight, as in most
+server applications, creating a new thread for each request can consume
+significant computing resources.
+
+
+Resource consumption. Active threads consume system resources, especially
+memory. When there are more runnable threads than available processors,
+threads sit idle. Having many idle threads can tie up a lot of memory,
+putting pressure on the garbage collector, and having many threads competing
+for the CPUs can impose other performance costs as well. If you have
+enough threads to keep all the CPUs busy, creating more threads won’t help
+and may even hurt.
+
+
+Stability. There is a limit on how many threads can be created. The limit varies
+by platform and is affected by factors including JVM invocation parameters,
+the requested stack size in the Thread constructor, and limits on threads
+placed by the underlying operating system.2 When you hit this limit, the
+most likely result is an OutOfMemoryError. Trying to recover from such an
+error is very risky; it is far easier to structure your program to avoid hitting
+this limit.
+
+
+6.2 The Executor framework
+
+Tasks are logical units of work, and threads are a mechanism by which tasks
+can run asynchronously.
+
+In Chapter 5, we saw how to use bounded queues to prevent an overloaded
+application from running out of memory. Thread pools offer the same benefit for
+thread management, and java.util.concurrent provides a flexible thread pool
+implementation as part of the Executor framework. The primary abstraction for
+task execution in the Java class libraries is not Thread, but Executor, shown in
+Listing 6.3.
+
+Executor may be a simple interface, but it forms the basis for a flexible and
+powerful framework for asynchronous task execution that supports a wide variety
+of task execution policies. It provides a standard means of decoupling task
+submission from task execution, describing tasks with Runnable. The Executor
+implementations also provide lifecycle support and hooks for adding statistics
+gathering, application management, and monitoring.
+
+Executor is based on the producer-consumer pattern, where activities that
+submit tasks are the producers (producing units of work to be done) and the
+threads that execute tasks are the consumers (consuming those units of work).
+
+Using an Executor is usually the easiest path to implementing a producer-consumer
+design in your application.
+
+
+6.2.2 Execution policies
+The value of decoupling submission from execution is that it lets you easily specify,
+and subsequently change without great difficulty, the execution policy for a
+given class of tasks. An execution policy specifies the “what, where, when, and
+how” of task execution, including:
+
+Execution policies are a resource management tool, and the optimal policy
+depends on the available computing resources and your quality-of-service requirements.
+By limiting the number of concurrent tasks, you can ensure that
+the application does not fail due to resource exhaustion or suffer performance
+problems due to contention for scarce resources.3 Separating the specification of
+execution policy from task submission makes it practical to select an execution
+policy at deployment time that is matched to the available hardware.
+
+Whenever you see code of the form:
+new Thread(runnable).start()
+and you think you might at some point want a more flexible execution
+policy, seriously consider replacing it with the use of an Executor.
+
+6.2.3 Thread pools
+A thread pool, as its name suggests, manages a homogeneous pool of worker
+threads. A thread pool is tightly bound to a work queue holding tasks waiting to
+be executed. Worker threads have a simple life: request the next task from the
+work queue, execute it, and go back to waiting for another task.
+
+Executing tasks in pool threads has a number of advantages over the threadper-
+task approach.Reusing an existing thread instead of creating a new one
+amortizes thread creation and teardown costs over multiple requests. As an
+added bonus, since the worker thread often already exists at the time the request
+arrives, the latency associated with thread creation does not delay task execution,
+thus improving responsiveness. By properly tuning the size of the thread pool,
+you can have enough threads to keep the processors busy while not having so
+many that your application runs out of memory or thrashes due to competition
+among threads for resources.
+The class library provides
+
+
+newFixedThreadPool. A fixed-size thread pool creates threads as tasks are submitted,
+up to the maximum pool size, and then attempts to keep the pool
+size constant (adding new threads if a thread dies due to an unexpected
+Exception).
+
+newCachedThreadPool. A cached thread pool has more flexibility to reap idle
+threads when the current size of the pool exceeds the demand for processing,
+and to add new threads when demand increases, but places no bounds
+on the size of the pool.
+
+newSingleThreadExecutor. A single-threaded executor creates a single worker
+thread to process tasks, replacing it if it dies unexpectedly. Tasks are guaranteed
+to be processed sequentially according to the order imposed by the
+task queue (FIFO, LIFO, priority order).4
+
+newScheduledThreadPool. A fixed-size thread pool that supports delayed and
+periodic task execution, similar to Timer. (See Section 6.2.5.)
+
+The newFixedThreadPool and newCachedThreadPool factories return instances
+of the general-purpose ThreadPoolExecutor, which can also be used
+directly to construct more specialized executors.
+
+6.2.4 Executor lifecycle
+
+An Executor
+implementation is likely to create threads for processing tasks. But the JVM
+can’t exit until all the (nondaemon) threads have terminated, so failing to shut
+down an Executor could prevent the JVM from exiting.
+
+Because an Executor processes tasks asynchronously, at any given time the
+state of previously submitted tasks is not immediately obvious. Some may have
+completed, some may be currently running, and others may be queued awaiting
+execution. In shutting down an application, there is a spectrum from graceful
+shutdown (finish what you’ve started but don’t accept any new work) to abrupt
+shutdown (turn off the power to the machine room), and various points in between.
+Since Executors provide a service to applications, they should be able to
+be shut down as well, both gracefully and abruptly, and feed back information to
+the application about the status of tasks that were affected by the shutdown.
+
+
+To address the issue of execution service lifecycle, the ExecutorService interface
+extends Executor, adding a number of methods for lifecycle management
+(as well as some convenience methods for task submission).
+
+The lifecycle implied by ExecutorService has three states—running, shutting
+down, and terminated. ExecutorServices are initially created in the running state.
+The shutdown method initiates a graceful shutdown: no new tasks are accepted
+but previously submitted tasks are allowed to complete—including those that
+have not yet begun execution. The shutdownNow method initiates an abrupt shutdown:
+it attempts to cancel outstanding tasks and does not start any tasks that
+are queued but not begun.
+
+Tasks submitted to an ExecutorService after it has been shut down are handled
+by the rejected execution handler (see Section 8.3.3), which might silently dis
+card the task or might cause execute to throw the unchecked RejectedExecutionException.
+Once all tasks have completed, the ExecutorService transitions
+to the terminated state. You can wait for an ExecutorService to reach the terminated
+state with awaitTermination, or poll for whether it has yet terminated with
+isTerminated. It is common to follow shutdown immediately by awaitTermination,
+creating the effect of synchronously shutting down the ExecutorService.
+(Executor shutdown and task cancellation are covered in more detail in Chapter
+7.)
+
+6.2.5 Delayed and periodic tasks
+
+The Timer facility manages the execution of deferred (“run this task in 100 ms”)
+and periodic (“run this task every 10 ms”) tasks. However, Timer has some drawbacks,
+and ScheduledThreadPoolExecutor should be thought of as its replacement.
+6 You can construct a ScheduledThreadPoolExecutor through its constructor
+or through the newScheduledThreadPool factory.
+
+
+6.3.2 Result-bearing tasks: Callable and Future
+The Executor framework uses Runnable as its basic task representation. Runnable
+is a fairly limiting abstraction; run cannot return a value or throw checked
+exceptions, although it can have side effects such as writing to a log file or placing
+a result in a shared data structure.
+
+Many tasks are effectively deferred computations—executing a database
+query, fetching a resource over the network, or computing a complicated function.
+For these types of tasks, Callable is a better abstraction: it expects that the
+main entry point, call, will return a value and anticipates that it might throw
+an exception.7 Executors includes several utility methods for wrapping other
+types of tasks, including Runnable and java.security.PrivilegedAction, with
+a Callable.
+
+Runnable and Callable describe abstract computational tasks. Tasks are usually
+finite: they have a clear starting point and they eventually terminate. The
+lifecycle of a task executed by an Executor has four phases: created, submitted,
+started, and completed. Since tasks can take a long time to run, we also want to be
+able to cancel a task. In the Executor framework, tasks that have been submitted
+but not yet started can always be cancelled, and tasks that have started can sometimes
+be cancelled if they are responsive to interruption. Cancelling a task that
+has already completed has no effect.
+
+Future represents the lifecycle of a task and provides methods to test whether
+the task has completed or been cancelled, retrieve its result, and cancel the task.
+Callable and Future are shown in Listing 6.11. Implicit in the specification of
+Future is that task lifecycle can only move forwards, not backwards—just like the
+ExecutorService lifecycle. Once a task is completed, it stays in that state forever.
+
+
+The real performance payoff of dividing a program’s workload into tasks
+comes when there are a large number of independent, homogeneous tasks
+that can be processed concurrently.
+
+
+6.3.5 CompletionService: Executor meets BlockingQueue
+
+If you have a batch of computations to submit to an Executor and you want
+to retrieve their results as they become available, you could retain the Future
+associated with each task and repeatedly poll for completion by calling get with
+a timeout of zero. This is possible, but tedious. Fortunately there is a better way:
+a completion service.
+
+CompletionService combines the functionality of an Executor and a BlockingQueue.
+You can submit Callable tasks to it for execution and use the queuelike
+methods take and poll to retrieve completed results, packaged as Futures,
+as they become available. ExecutorCompletionService implements Completion-
+Service, delegating the computation to an Executor.
+
+
+6.3.7 Placing time limits on tasks
+
+The primary challenge in executing tasks within a time budget is making
+sure that you don’t wait longer than the time budget to get an answer or find
+out that one is not forthcoming. The timed version of Future.get supports this
+requirement: it returns as soon as the result is ready, but throws TimeoutException
+if the result is not ready within the timeout period.
+
+Summary
+Structuring applications around the execution of tasks can simplify development
+and facilitate concurrency. The Executor framework permits you to decouple
+task submission from execution policy and supports a rich variety of execution
+policies; whenever you find yourself creating threads to perform tasks, consider
+using an Executor instead. To maximize the benefit of decomposing an application
+into tasks, you must identify sensible task boundaries. In some applications,
+the obvious task boundaries work well, whereas in others some analysis may be
+required to uncover finer-grained exploitable parallelism.
+
+Chapter 7
+Cancellation and Shutdown
+
+
+Getting tasks and threads to stop safely, quickly, and reliably is not always
+easy. Java does not provide any mechanism for safely forcing a thread to stop
+what it is doing.1 Instead, it provides interruption, a cooperative mechanism that
+lets one thread ask another to stop what it is doing.
+The cooperative approach is required because we rarely want a task, thread,
+or service to stop immediately, since that could leave shared data structures in
+an inconsistent state. Instead, tasks and services can be coded so that, when
+requested, they clean up any work currently in progress and then terminate. This
+provides greater flexibility, since the task code itself is usually better able to assess
+the cleanup required than is the code requesting cancellation.
+
+7.1 Task cancellation
+
+An activity is cancellable if external code can move it to completion before its
+normal completion.
+
+There is no safe way to preemptively stop a thread in Java, and therefore no
+safe way to preemptively stop a task. There are only cooperative mechanisms,
+by which the task and the code requesting cancellation follow an agreed-upon
+protocol.
+One such cooperative mechanism is setting a “cancellation requested” flag
+that the task checks periodically; if it finds the flag set, the task terminates early.
+
+A task that wants to be cancellable must have a cancellation policy that specifies
+the “how”, “when”, and “what” of cancellation—how other code can request
+cancellation, when the task checks whether cancellation has been requested, and
+what actions the task takes in response to a cancellation request.
+
+7.1.1 Interruption
+
+
+There is nothing in the API or language specification that ties interruption
+to any specific cancellation semantics, but in practice, using interruption
+for anything but cancellation is fragile and difficult to sustain in larger
+applications.
+
+Blocking library methods like Thread.sleep and Object.wait try to detect
+when a thread has been interrupted and return early. They respond to interruption
+by clearing the interrupted status and throwing InterruptedException,
+indicating that the blocking operation completed early due to interruption. The
+JVM makes no guarantees on how quickly a blocking method will detect interruption,
+but in practice this happens reasonably quickly.
+
+If a thread is interrupted when it is not blocked, its interrupted status is set,
+and it is up to the activity being cancelled to poll the interrupted status to detect
+interruption. In this way interruption is “sticky”—if it doesn’t trigger an InterruptedException,
+evidence of interruption persists until someone deliberately
+clears the interrupted status.
+
+A good way to think about interruption is that it does not actually interrupt
+a running thread; it just requests that the thread interrupt itself at the next convenient
+opportunity. (These opportunities are called cancellation points.) Some
+methods, such as wait, sleep, and join, take such requests seriously, throwing
+an exception when they receive an interrupt request or encounter an already set
+interrupt status upon entry. Well behaved methods may totally ignore such requests
+so long as they leave the interruption request in place so that calling code
+can do something with it. Poorly behaved methods swallow the interrupt request,
+thus denying code further up the call stack the opportunity to act on it.
+
+
+Calling interrupt does not necessarily stop the target thread from doing
+what it is doing; it merely delivers the message that interruption has been
+requested.
+
+Interruption is usually the most sensible way to implement cancellation.
+
+
+7.1.2 Interruption policies
+Just as tasks should have a cancellation policy, threads should have an interruption
+policy. An interruption policy determines how a thread interprets an interruption
+request—what it does (if anything) when one is detected, what units of work
+are considered atomic with respect to interruption, and how quickly it reacts to
+interruption.
+
+
+It is important to distinguish between how tasks and threads should react to interruption.
+A single interrupt request may have more than one desired recipient—
+interrupting a worker thread in a thread pool can mean both “cancel the current
+task” and “shut down the worker thread”.
+
+and “shut down the worker thread”.
+Tasks do not execute in threads they own; they borrow threads owned by a
+service such as a thread pool. Code that doesn’t own the thread (for a thread
+pool, any code outside of the thread pool implementation) should be careful to
+preserve the interrupted status so that the owning code can eventually act on it,
+even if the “guest” code acts on the interruption as well.
+
+This is why most blocking library methods simply throw InterruptedException
+in response to an interrupt. They will never execute in a thread they own, so
+they implement the most reasonable cancellation policy for task or library code:
+get out of the way as quickly as possible and communicate the interruption back
+to the caller so that code higher up on the call stack can take further action.
+
+A task needn’t necessarily drop everything when it detects an interruption
+request—it can choose to postpone it until a more opportune time by remembering
+that it was interrupted, finishing the task it was performing, and then throwing
+InterruptedException or otherwise indicating interruption. This technique
+can protect data structures from corruption when an activity is interrupted in the
+middle of an update.
+
+
+Because each thread has its own interruption policy, you should not interrupt
+a thread unless you know what interruption means to that thread.
+
+
+Activities that do not support cancellation but still call interruptible blocking
+methods will have to call them in a loop, retrying when interruption is detected.
+In this case, they should save the interruption status locally and restore it just
+before returning, as shown in Listing 7.7, rather than immediately upon catching
+InterruptedException. Setting the interrupted status too early could result in an
+infinite loop, because most interruptible blocking methods check the interrupted
+status on entry and throw InterruptedException immediately if it is set. (Interruptible
+methods usually poll for interruption before blocking or doing any
+significant work, so as to be as responsive to interruption as possible.)
+
+7.1.3 Responding to interruption
+As mentioned in Section 5.4, when you call an interruptible blocking method
+such as Thread.sleep or BlockingQueue.put, there are two practical strategies
+for handling InterruptedException:
+• Propagate the exception (possibly after some task-specific cleanup), making
+your method an interruptible blocking method, too; or
+• Restore the interruption status so that code higher up on the call stack can
+deal with it.
+
+
+If you don’t want to or cannot propagate InterruptedException (perhaps
+because your task is defined by a Runnable), you need to find another way to
+preserve the interruption request. The standard way to do this is to restore the
+interrupted status by calling interrupt again. What you should not do is swallow
+the InterruptedException by catching it and doing nothing in the catch block,
+unless your code is actually implementing the interruption policy for a thread.
+
+Only code that implements a thread’s interruption policy may swallow an
+interruption request. General-purpose task and library code should never
+swallow interruption requests.
+
+For example, when a worker thread owned by a ThreadPoolExecutor detects interruption,
+it checks whether the pool is being shut down. If so, it performs some
+pool cleanup before terminating; otherwise it may create a new thread to restore
+the thread pool to the desired size.
+
+
+7.1.5 Cancellation via Future
+
+
+ExecutorService.submit returns a Future describing the task. Future has
+a cancel method that takes a boolean argument, mayInterruptIfRunning, and
+returns a value indicating whether the cancellation attempt was successful. (This
+tells you only whether it was able to deliver the interruption, not whether the task
+detected and acted on it.) When mayInterruptIfRunning is true and the task is
+currently running in some thread, then that thread is interrupted. Setting this
+argument to false means “don’t run this task if it hasn’t started yet”, and should
+be used for tasks that are not designed to handle interruption.
+
+Since you shouldn’t interrupt a thread unless you know its interruption policy,
+when is it OK to call cancel with an argument of true? The task execution
+threads created by the standard Executor implementations implement an interruption
+policy that lets tasks be cancelled using interruption, so it is safe to set
+mayInterruptIfRunning when cancelling tasks through their Futures when they
+are running in a standard Executor. You should not interrupt a pool thread directly
+when attempting to cancel a task, because you won’t know what task is
+running when the interrupt request is delivered—do this only through the task’s
+Future.
+
+
+When Future.get throws InterruptedException or TimeoutException
+and you know that the result is no longer needed by the program,
+cancel the task with Future.cancel.
+
+7.1.6 Dealing with non-interruptible blocking
+
+
+Many blocking library methods respond to interruption by returning early and
+throwing InterruptedException, which makes it easier to build tasks that are
+responsive to cancellation. However, not all blocking methods or blocking mechanisms
+are responsive to interruption; if a thread is blocked performing synchronous
+socket I/O or waiting to acquire an intrinsic lock, interruption has no
+effect other than setting the thread’s interrupted status. We can sometimes convince
+threads blocked in noninterruptible activities to stop by means similar to
+interruption, but this requires greater awareness of why the thread is blocked.
+
+7.1.7 Encapsulating nonstandard cancellation with newTaskFor
+
+The technique used in ReaderThread to encapsulate nonstandard cancellation can
+be refined using the newTaskFor hook added to ThreadPoolExecutor in Java 6.
+When a Callable is submitted to an ExecutorService, submit returns a Future
+that can be used to cancel the task. The newTaskFor hook is a factory method that
+creates the Future representing the task. It returns a RunnableFuture, an interface
+that extends both Future and Runnable (and is implemented by FutureTask).
+
+7.2 Stopping a thread-based service
+
+Applications commonly create services that own threads, such as thread pools,
+and the lifetime of these services is usually longer than that of the method that
+creates them. If the application is to shut down gracefully, the threads owned by
+these services need to be terminated. Since there is no preemptive way to stop a
+thread, they must instead be persuaded to shut down on their own.
+
+Sensible encapsulation practices dictate that you should not manipulate a
+thread—interrupt it, modify its priority, etc.—unless you own it. The thread API
+has no formal concept of thread ownership: a thread is represented with a Thread
+object that can be freely shared like any other object. However, it makes sense to
+think of a thread as having an owner, and this is usually the class that created the
+thread. So a thread pool owns its worker threads, and if those threads need to be
+interrupted, the thread pool should take care of it.
+
+As with any other encapsulated object, thread ownership is not transitive: the
+application may own the service and the service may own the worker threads, but
+the application doesn’t own the worker threads and therefore should not attempt
+to stop them directly. Instead, the service should provide lifecycle methods for
+shutting itself down that also shut down the owned threads; then the application
+can shut down the service, and the service can shut down the threads. Executor-
+Service provides the shutdown and shutdownNow methods; other thread-owning
+services should provide a similar shutdown mechanism.
+
+Provide lifecycle methods whenever a thread-owning service has a lifetime
+longer than that of the method that created it.
+
+
+7.2.2 ExecutorService shutdown
+
+ExecutorService offers two ways to shut down:
+graceful shutdown with shutdown, and abrupt shutdown with shutdownNow. In
+an abrupt shutdown, shutdownNow returns the list of tasks that had not yet started
+after attempting to cancel all actively executing tasks.
+
+The two different termination options offer a tradeoff between safety and responsiveness:
+abrupt termination is faster but riskier because tasks may be interrupted
+in the middle of execution, and normal termination is slower but safer
+because the ExecutorService does not shut down until all queued tasks are processed.
+Other thread-owning services should consider providing a similar choice
+of shutdown modes.
+
+7.2.3 Poison pills
+Another way to convince a producer-consumer service to shut down is with a
+poison pill: a recognizable object placed on the queue that means “when you get
+this, stop.” With a FIFO queue, poison pills ensure that consumers finish the
+work on their queue before shutting down, since any work submitted prior to
+submitting the poison pill will be retrieved before the pill; producers should not
+submit any work after putting a poison pill on the queue.
+
+Poison pills work only when the number of producers and consumers is
+known.
+
+
+7.2.4 Example: a one-shot execution service
+If a method needs to process a batch of tasks and does not return until all the
+tasks are finished, it can simplify service lifecycle management by using a private
+Executor whose lifetime is bounded by that method. (The invokeAll and invokeAny
+methods can often be useful in such situations.)
+
+
+7.2.5 Limitations of shutdownNow
+When an ExecutorService is shut down abruptly with shutdownNow, it attempts
+to cancel the tasks currently in progress and returns a list of tasks that were submitted
+but never started so that they can be logged or saved for later processing.
+
+However, there is no general way to find out which tasks started but did not
+complete. This means that there is no way of knowing the state of the tasks
+in progress at shutdown time unless the tasks themselves perform some sort of
+checkpointing. To know which tasks have not completed, you need to know not
+only which tasks didn’t start, but also which tasks were in progress when the
+executor was shut down.
+
+7.3 Handling abnormal thread termination
+
+It is obvious when a single-threaded console application terminates due to an
+uncaught exception—the program stops running and produces a stack trace that
+is very different from typical program output. Failure of a thread in a concurrent
+application is not always so obvious. The stack trace may be printed on
+the console, but no one may be watching the console. Also, when a thread fails,
+the application may appear to continue to work, so its failure could go unnoticed.
+Fortunately, there are means of both detecting and preventing threads from
+“leaking” from an application.
+
+The leading cause of premature thread death is RuntimeException. Because
+these exceptions indicate a programming error or other unrecoverable problem,
+they are generally not caught. Instead they propagate all the way up the stack, at
+which point the default behavior is to print a stack trace on the console and let
+the thread terminate.
+
+Just about any code can throw a RuntimeException. Whenever you call another
+method, you are taking a leap of faith that it will return normally or throw
+one of the checked exceptions its signature declares. The less familiar you are
+with the code being called, the more skeptical you should be about its behavior.
+
+Task-processing threads such as the worker threads in a thread pool or the
+Swing event dispatch thread spend their whole life calling unknown code through
+an abstraction barrier like Runnable, and these threads should be very skeptical
+that the code they call will be well behaved. It would be very bad if a service
+like the Swing event thread failed just because some poorly written event handler
+threw a NullPointerException. Accordingly, these facilities should call
+tasks within a try-catch block that catches unchecked exceptions, or within a
+try-finally block to ensure that if the thread exits abnormally the framework is
+informed of this and can take corrective action. This is one of the few times when
+you might want to consider catching RuntimeException—when you are calling
+unknown, untrusted code through an abstraction such as Runnable.
+
+7.3.1 Uncaught exception handlers
+
+The previous section offered a proactive approach to the problem of unchecked
+exceptions. The Thread API also provides the UncaughtExceptionHandler facility,
+which lets you detect when a thread dies due to an uncaught exception.
+The two approaches are complementary: taken together, they provide defense-indepth
+against thread leakage.
+
+When a thread exits due to an uncaught exception, the JVM reports this event
+to an application-provided UncaughtExceptionHandler (see Listing 7.24); if no
+handler exists, the default behavior is to print the stack trace to System.err.8
+
+In long-running applications, always use uncaught exception handlers for
+all threads that at least log the exception.
+
+To set an UncaughtExceptionHandler for pool threads, provide a ThreadFactory
+to the ThreadPoolExecutor constructor. (As with all thread manipulation,
+only the thread’s owner should change its UncaughtExceptionHandler.) The standard
+thread pools allow an uncaught task exception to terminate the pool thread,
+but use a try-finally block to be notified when this happens so the thread can
+be replaced. Without an uncaught exception handler or other failure notification
+mechanism, tasks can appear to fail silently, which can be very confusing. If you
+want to be notified when a task fails due to an exception so that you can take some
+task-specific recovery action, either wrap the task with a Runnable or Callable
+that catches the exception or override the afterExecute hook in ThreadPoolExecutor.
+
+Somewhat confusingly, exceptions thrown from tasks make it to the uncaught
+exception handler only for tasks submitted with execute; for tasks submitted
+with submit, any thrown exception, checked or not, is considered to be part of the
+task’s return status. If a task submitted with submit terminates with an exception,
+it is rethrown by Future.get, wrapped in an ExecutionException.
+
+7.4 JVM shutdown
+
+The JVM can shut down in either an orderly or abrupt manner. An orderly shutdown
+is initiated when the last “normal” (nondaemon) thread terminates, someone
+calls System.exit, or by other platform-specific means (such as sending a
+SIGINT or hitting Ctrl-C). While this is the standard and preferred way for the
+JVM to shut down, it can also be shut down abruptly by calling Runtime.halt
+or by killing the JVM process through the operating system (such as sending a
+SIGKILL).
+
+7.4.1 Shutdown hooks
+
+In an orderly shutdown, the JVM first starts all registered shutdown hooks. Shutdown
+hooks are unstarted threads that are registered with Runtime.addShutdownHook.
+The JVM makes no guarantees on the order in which shutdown hooks
+are started. If any application threads (daemon or nondaemon) are still running
+at shutdown time, they continue to run concurrently with the shutdown process.
+When all shutdown hooks have completed, the JVM may choose to run finalizers
+if runFinalizersOnExit is true, and then halts. The JVM makes no attempt to
+stop or interrupt any application threads that are still running at shutdown time;
+they are abruptly terminated when the JVM eventually halts. If the shutdown
+hooks or finalizers don’t complete, then the orderly shutdown process “hangs”
+and the JVM must be shut down abruptly. In an abrupt shutdown, the JVM is not
+required to do anything other than halt the JVM; shutdown hooks will not run.
+
+Shutdown hooks should be thread-safe: they must use synchronization when
+accessing shared data and should be careful to avoid deadlock, just like any other
+concurrent code. Further, they should not make assumptions about the state
+of the application (such as whether other services have shut down already or
+all normal threads have completed) or about why the JVM is shutting down,
+and must therefore be coded extremely defensively. Finally, they should exit as
+quickly as possible, since their existence delays JVM termination at a time when
+the user may be expecting the JVM to terminate quickly.
+
+Shutdown hooks can be used for service or application cleanup, such as deleting
+temporary files or cleaning up resources that are not automatically cleaned
+up by the OS.
+
+Because shutdown hooks all run concurrently, closing the log file could cause
+trouble for other shutdown hooks who want to use the logger. To avoid this
+problem, shutdown hooks should not rely on services that can be shut down by
+the application or other shutdown hooks. One way to accomplish this is to use a
+single shutdown hook for all services, rather than one for each service, and have
+it call a series of shutdown actions. This ensures that shutdown actions execute
+sequentially in a single thread, thus avoiding the possibility of race conditions
+or deadlock between shutdown actions. This technique can be used whether or
+not you use shutdown hooks; executing shutdown actions sequentially rather
+than concurrently eliminates many potential sources of failure.
+
+Normal threads and daemon threads differ only in what happens when they
+exit. When a thread exits, the JVM performs an inventory of running threads,
+and if the only threads that are left are daemon threads, it initiates an orderly
+shutdown. When the JVM halts, any remaining daemon threads are abandoned—
+finally blocks are not executed, stacks are not unwound—the JVM just exits.
+
+Daemon threads should be used sparingly—few processing activities can be
+safely abandoned at any time with no cleanup. In particular, it is dangerous
+to use daemon threads for tasks that might perform any sort of I/O. Daemon
+threads are best saved for “housekeeping” tasks, such as a background thread
+that periodically removes expired entries from an in-memory cache.
+
+Daemon threads are not a good substitute for properly managing the lifecycle
+of services within an application.
+
+7.4.2 Daemon threads
+
+Sometimes you want to create a thread that performs some helper function but
+you don’t want the existence of this thread to prevent the JVM from shutting
+down. This is what daemon threads are for.
+Threads are divided into two types: normal threads and daemon threads.
+When the JVM starts up, all the threads it creates (such as garbage collector and
+other housekeeping threads) are daemon threads, except the main thread. When
+a new thread is created, it inherits the daemon status of the thread that created it,
+so by default any threads created by the main thread are also normal threads.
+
+7.4.3 Finalizers
+
+The garbage collector does a good job of reclaiming memory resources when they
+are no longer needed, but some resources, such as file or socket handles, must be
+explicitly returned to the operating system when no longer needed. To assist in
+this, the garbage collector treats objects that have a nontrivial finalize method
+specially: after they are reclaimed by the collector, finalize is called so that
+persistent resources can be released.
+
+Since finalizers can run in a thread managed by the JVM, any state accessed
+by a finalizer will be accessed by more than one thread and therefore must be
+accessed with synchronization. Finalizers offer no guarantees on when or even if
+they run, and they impose a significant performance cost on objects with nontrivial
+finalizers. They are also extremely difficult to write correctly.9 In most cases,
+the combination of finally blocks and explicit close methods does a better job
+of resource management than finalizers; the sole exception is when you need to
+manage objects that hold resources acquired by native methods. For these reasons
+and others, work hard to avoid writing or using classes with finalizers (other than
+the platform library classes) [EJ Item 6].
+
+Avoid finalizers.
+
+Summary
+End-of-lifecycle issues for tasks, threads, services, and applications can add complexity
+to their design and implementation. Java does not provide a preemptive
+mechanism for cancelling activities or terminating threads. Instead, it provides a
+cooperative interruption mechanism that can be used to facilitate cancellation, but
+it is up to you to construct protocols for cancellation and use them consistently.
+Using FutureTask and the Executor framework simplifies building cancellable
+tasks and services.
+
+8.3.2 Managing queued tasks
+
+The newCachedThreadPool factory is a good default choice for an Executor,
+providing better queuing performance than a fixed thread pool.5
+A fixed size thread pool is a good choice when you need to limit the
+number of concurrent tasks for resource-management purposes, as in a
+server application that accepts requests from network clients and would
+otherwise be vulnerable to overload.
+Bounding either the thread pool or the work queue is suitable only when tasks
+are independent. With tasks that depend on other tasks, bounded thread pools
+or queues can cause thread starvation deadlock; instead, use an unbounded pool
+configuration like newCachedThreadPool.6
+
+
+8.3.3 Saturation policies
+When a bounded work queue fills up, the saturation policy comes into play. The
+saturation policy for a ThreadPoolExecutor can be modified by calling setRejectedExecutionHandler.
+(The saturation policy is also used when a task is
+submitted to an Executor that has been shut down.) Several implementations of
+RejectedExecutionHandler are provided, each implementing a different saturation
+policy: AbortPolicy, CallerRunsPolicy, DiscardPolicy, and DiscardOldestPolicy.
+
+
+
+The default policy, abort, causes execute to throw the unchecked Rejected-
+ExecutionException; the caller can catch this exception and implement its own
+overflow handling as it sees fit. The discard policy silently discards the newly
+submitted task if it cannot be queued for execution; the discard-oldest policy discards
+the task that would otherwise be executed next and tries to resubmit the
+new task. (If the work queue is a priority queue, this discards the highest-priority
+element, so the combination of a discard-oldest saturation policy and a priority
+queue is not a good one.)
+The caller-runs policy implements a form of throttling that neither discards
+tasks nor throws an exception, but instead tries to slow down the flow of new
+tasks by pushing some of the work back to the caller. It executes the newly
+submitted task not in a pool thread, but in the thread that calls execute. If we
+modified our WebServer example to use a bounded queue and the caller-runs
+policy, after all the pool threads were occupied and the work queue filled up the
+next task would be executed in the main thread during the call to execute.
+
+8.3.4 Thread factories
+Whenever a thread pool needs to create a thread, it does so through a thread
+factory (see Listing 8.5). The default thread factory creates a new, nondaemon
+thread with no special configuration. Specifying a thread factory allows you to
+customize the configuration of pool threads. ThreadFactory has a single method,
+newThread, that is called whenever a thread pool needs to create a new thread.
+
+8.4 Extending ThreadPoolExecutor
+ThreadPoolExecutor was designed for extension, providing several “hooks” for
+subclasses to override—beforeExecute, afterExecute, and terminated—that
+can be used to extend the behavior of ThreadPoolExecutor.
+The beforeExecute and afterExecute hooks are called in the thread that
+executes the task, and can be used for adding logging, timing, monitoring, or
+statistics gathering. The afterExecute hook is called whether the task completes
+by returning normally from run or by throwing an Exception. (If the task completes
+with an Error, afterExecute is not called.) If beforeExecute throws a
+RuntimeException, the task is not executed and afterExecute is not called.
+The terminated hook is called when the thread pool completes the shutdown
+process, after all tasks have finished and all worker threads have shut down. It
+can be used to release resources allocated by the Executor during its lifecycle,
+perform notification or logging, or finalize statistics gathering.
+
+
+
+Chapter 10
+Avoiding Liveness Hazards
+
+
+There is often a tension between safety and liveness. We use locking to ensure
+thread safety, but indiscriminate use of locking can cause lock-ordering deadlocks.
+Similarly, we use thread pools and semaphores to bound resource consumption,
+but failure to understand the activities being bounded can cause resource deadlocks.
+
+10.1 Deadlock
+
+
+When a thread holds a lock forever, other threads attempting to acquire that
+lock will block forever waiting. When thread A holds lock L and tries to acquire
+lock M, but at the same time thread B holds M and tries to acquire L, both threads
+will wait forever. This situation is the simplest case of deadlock (or deadly embrace),
+where multiple threads wait forever due to a cyclic locking dependency.
+(Think of the threads as the nodes of a directed graph whose edges represent the relation
+“Thread A is waiting for a resource held by thread B”. If this graph is cyclical,
+there is a deadlock.)
+
+Database systems are designed to detect and recover from deadlock. A transaction
+may acquire many locks, and locks are held until the transaction commits.
+So it is quite possible, and in fact not uncommon, for two transactions to deadlock.
+Without intervention, they would wait forever (holding locks that are probably required
+by other transactions as well). But the database server is not going to let
+this happen. When it detects that a set of transactions is deadlocked (which it
+does by searching the is-waiting-for graph for cycles), it picks a victim and aborts
+that transaction. This releases the locks held by the victim, allowing the other
+transactions to proceed. The application can then retry the aborted transaction,
+which may be able to complete now that any competing transactions have completed.
+
+The JVM is not nearly as helpful in resolving deadlocks as database servers
+are. When a set of Java threads deadlock, that’s the end of the game—those
+threads are permanently out of commission. Depending on what those threads
+do, the application may stall completely, or a particular subsystem may stall, or
+performance may suffer. The only way to restore the application to health is to
+abort and restart it—and hope the same thing doesn’t happen again.
+
+10.1.1 Lock-ordering deadlocks
+
+The deadlock in LeftRightDeadlock came about because the two threads attempted
+to acquire the same locks in a different order. If they asked for the locks
+in the same order, there would be no cyclic locking dependency and therefore no
+deadlock. If you can guarantee that every thread that needs locks L and M at the
+same time always acquires L and M in the same order, there will be no deadlock.
+
+A program will be free of lock-ordering deadlocks if all threads acquire
+the locks they need in a fixed global order.
+
+10.1.2 Dynamic lock order deadlocks
+
+How can transferMoney deadlock? It may appear as if all the threads acquire
+their locks in the same order, but in fact the lock order depends on the order of
+arguments passed to transferMoney, and these in turn might depend on external
+inputs.
+
+Deadlocks like this one can be spotted the same way as in Listing 10.1—look
+for nested lock acquisitions. Since the order of arguments is out of our control,
+to fix the problem we must induce an ordering on the locks and acquire them
+according to the induced ordering consistently throughout the application.
+
+One way to induce an ordering on objects is to use System.identityHashCode,
+which returns the value that would be returned by Object.hashCode.
+
+10.1.3 Deadlocks between cooperating objects
+
+Invoking an alien method with a lock held is asking for liveness trouble.
+The alien method might acquire other locks (risking deadlock) or block
+for an unexpectedly long time, stalling other threads that need the lock
+you hold.
+
+10.1.4 Open calls
+
+Calling a method with no locks held is called an open call [CPJ 2.4.1.3], and
+classes that rely on open calls are more well-behaved and composable than classes
+that make calls with locks held. Using open calls to avoid deadlock is analogous
+to using encapsulation to provide thread safety: while one can certainly construct
+a thread-safe program without any encapsulation, the thread safety analysis of a
+program that makes effective use of encapsulation is far easier than that of one
+that does not. Similarly, the liveness analysis of a program that relies exclusively
+on open calls is far easier than that of one that does not. Restricting yourself to
+open calls makes it far easier to identify the code paths that acquire multiple locks
+and therefore to ensure that locks are acquired in a consistent order.3
+
+Strive to use open calls throughout your program. Programs that rely on
+open calls are far easier to analyze for deadlock-freedom than those that
+allow calls to alien methods with locks held.
+
+10.1.5 Resource deadlocks
+
+Just as threads can deadlock when they are each waiting for a lock that the other
+holds and will not release, they can also deadlock when waiting for resources.
+
+Say you have two pooled resources, such as connection pools for two different
+databases. Resource pools are usually implemented with semaphores (see Section
+5.5.3) to facilitate blocking when the pool is empty.
+
+Another form of resource-based deadlock is thread-starvation deadlock. We saw
+an example of this hazard in Section 8.1.1, where a task that submits a task and
+waits for its result executes in a single-threaded Executor. In that case, the first
+task will wait forever, permanently stalling that task and all others waiting to
+execute in that Executor. Tasks that wait for the results of other tasks are the
+primary source of thread-starvation deadlock; bounded pools and interdependent
+tasks do not mix well.
+
+
+
+
+aa
+
+
+
+
+
+
+
