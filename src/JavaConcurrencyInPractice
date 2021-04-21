@@ -199,7 +199,7 @@ For each mutable state variable that may be accessed by more than one
 thread, all accesses to that variable must be performed with the same
 lock held. In this case, we say that the variable is guarded by that lock.
 
-3.
+3. Sharing Objects
 
 We stated at the beginning of Chapter 2 that writing correct concurrent programs
 is primarily about managing access to shared, mutable state. That chapter was
@@ -209,7 +209,6 @@ objects so they can be safely accessed by multiple threads. Together, they lay
 the foundation for building thread-safe classes and safely structuring concurrent
 applications using the java.util.concurrent library classes.
 
-
 We have seen how synchronized blocks and methods can ensure that operations
 execute atomically, but it is a common misconception that synchronized
 is only about atomicity or demarcating “critical sections”. Synchronization also
@@ -218,6 +217,7 @@ has another significant, and subtle, aspect: memory visibility.
 In order to ensure visibility of memory
 writes across threads, you must use synchronization.
 
+3.1 Visibility
 
 In the absence of synchronization, the compiler, processor, and runtime
 can do some downright weird things to the order in which operations appear
@@ -421,23 +421,28 @@ far, such as seeing stale values, losing updates, or observing an object to be i
 an inconsistent state, have to do with the vagaries of multiple threads trying to
 access the same mutable state at the same time. If an object’s state cannot be
 modified, these risks and complexities simply go away.
+
 An immutable object is one whose state cannot be changed after construction.
 Immutable objects are inherently thread-safe; their invariants are established by
 the constructor, and if their state cannot be changed, these invariants always hold.
 
+Immutable objects are always thread-safe.
 
 Immutable objects are simple. They can only be in one state, which is carefully
 controlled by the constructor. One of the most difficult elements of program
 design is reasoning about the possible states of complex objects. Reasoning about
 the state of immutable objects, on the other hand, is trivial.
 
+Immutable objects are also safer.
+
 Neither the Java Language Specification nor the Java Memory Model formally
 defines immutability, but immutability is not equivalent to simply declaring all
 fields of an object final. An object whose fields are all final may still be mutable,
 since final fields can hold references to mutable objects.
+
 An object is immutable if:
 • Its state cannot be modified after construction;
-• All its fields are final;12 and
+• All its fields are final and
 • It is properly constructed (the this reference does not escape during
 construction).
 
@@ -488,7 +493,111 @@ even though it does no explicit locking.
 
 3.5 Safe publication
 
+4. Composing Objects
 
+5. Building Blocks
+
+The last chapter explored several techniques for constructing thread-safe classes,
+including delegating thread safety to existing thread-safe classes. Where practical,
+delegation is one of the most effective strategies for creating thread-safe classes:
+just let existing thread-safe classes manage all the state.
+
+5.1 Synchronized Collections
+
+The synchronized collection classes include Vector and Hashtable, part of the original
+JDK, as well as their cousins added in JDK 1.2, the synchronized wrapper
+classes created by the Collections.synchronizedXxx factory methods. These
+classes achieve thread safety by encapsulating their state and synchronizing every
+public method so that only one thread at a time can access the collection
+state.
+
+5.1.1 Problems with synchronized collections
+The synchronized collections are thread-safe, but you may sometimes need to use
+additional client-side locking to guard compound actions. Common compound
+actions on collections include iteration (repeatedly fetch elements until the collection
+is exhausted), navigation (find the next element after this one according to
+some order), and conditional operations such as put-if-absent (check if a Map has
+a mapping for key K, and if not, add the mapping (K,V)). With a synchronized
+collection, these compound actions are still technically thread-safe even without
+client-side locking, but they may not behave as you might expect when other
+threads can concurrently modify the collection.
+
+Because the synchronized collections commit to a synchronization policy that
+supports client-side locking,1 it is possible to create new operations that are
+atomic with respect to other collection operations as long as we know which
+lock to use.The synchronized collection classes guard each method with the lock
+on the synchronized collection object itself. By acquiring the collection lock we
+can make getLast and deleteLast atomic, ensuring that the size of the Vector
+does not change between calling size and get.
+
+The problem of unreliable iteration can again be addressed by client-side locking,
+at some additional cost to scalability. By holding the Vector lock for the duration
+of iteration, as shown in Listing 5.4, we prevent other threads from modifying
+the Vector while we are iterating it. Unfortunately, we also prevent other threads
+from accessing it at all during this time, impairing concurrency.
+
+5.1.2 Iterators and ConcurrentModificationException
+The standard way to iterate
+a Collection is with an Iterator, either explicitly or through the for-each loop
+syntax introduced in Java 5.0, but using iterators does not obviate the need to
+lock the collection during iteration if other threads can concurrently modify it.
+The iterators returned by the synchronized collections are not designed to deal
+with concurrent modification, and they are fail-fast—meaning that if they detect
+that the collection has changed since iteration began, they throw the unchecked
+ConcurrentModificationException.
+
+These fail-fast iterators are not designed to be foolproof—they are designed
+to catch concurrency errors on a “good-faith-effort” basis and thus act only as
+early-warning indicators for concurrency problems. They are implemented by
+associating a modification count with the collection: if the modification count
+changes during iteration, hasNext or next throws ConcurrentModificationException.
+However, this check is done without synchronization, so there is a risk of
+seeing a stale value of the modification count and therefore that the iterator does
+not realize a modification has been made. This was a deliberate design tradeoff
+to reduce the performance impact of the concurrent modification detection code.
+
+There are several reasons, however, why locking a collection during iteration
+may be undesirable. Other threads that need to access the collection will block
+until the iteration is complete; if the collection is large or the task performed for
+each element is lengthy, they could wait a long time. Also, if the collection is
+locked as in Listing 5.4, doSomething is being called with a lock held, which is
+a risk factor for deadlock (see Chapter 10). Even in the absence of starvation or
+deadlock risk, locking collections for significant periods of time hurts application
+scalability. The longer a lock is held, the more likely it is to be contended, and if
+many threads are blocked waiting for a lock throughput and CPU utilization can
+suffer (see Chapter 11).
+
+An alternative to locking the collection during iteration is to clone the collection
+and iterate the copy instead. Since the clone is thread-confined, no other
+thread can modify it during iteration, eliminating the possibility of Concurrent-
+ModificationException. (The collection still must be locked during the clone
+operation itself.) Cloning the collection has an obvious performance cost; whether
+this is a favorable tradeoff depends on many factors including the size of the collection,
+how much work is done for each element, the relative frequency of iteration
+compared to other collection operations, and responsiveness and throughput
+requirements.
+
+5.1.3 Hidden iterators
+Just as encapsulating an object’s state makes it easier to preserve its invariants,
+encapsulating its synchronization makes it easier to enforce its
+synchronization policy
+
+5.2 Concurrent collections
+Java 5.0 improves on the synchronized collections by providing several concurrent
+collection classes. Synchronized collections achieve their thread safety by serializing
+all access to the collection’s state. The cost of this approach is poor concurrency;
+when multiple threads contend for the collection-wide lock, throughput
+suffers.
+
+The concurrent collections, on the other hand, are designed for concurrent access
+from multiple threads.Java 5.0 adds ConcurrentHashMap, a replacement for
+synchronized hash-based Map implementations, and CopyOnWriteArrayList, a replacement
+for synchronized List implementations for cases where traversal is the
+dominant operation. The new ConcurrentMap interface adds support for common
+compound actions such as put-if-absent, replace, and conditional remove.
+
+Replacing synchronized collections with concurrent collections can offer
+dramatic scalability improvements with little risk.
 
 5.4 Blocking and interruptible methods
 
