@@ -1,0 +1,471 @@
+Scala is functional
+Functional programming is guided by two main ideas.
+	The first idea is that functions are first-class values.
+	The second main idea of functional programming is that the operations of a program should map input values to output values rather than change data in placez.
+	Another way of stating this second idea of functional programming is that methods should not have any side effects
+	Methods like replace are called referentially transparent, which means that for any given input the method call could be replaced by its result
+	without affecting the program's semantics.
+Functional languages encourage immutable data structures and referentially transparent methods.
+
+Scala is statically typed
+	We hope to convince you in this book that Scala's type system is far from being a "complete pain." In
+	fact, it addresses nicely two of the usual concerns about static typing: Verbosity is avoided through type
+	inference, and flexibility is gained through pattern matching and several new ways to write and
+	compose types.With these impediments out of the way, the classical benefits of static type systems can
+	be better appreciated. Among the most important of these benefits are verifiable properties of program
+	abstractions, safe refactorings, and better documentation.
+	Verifiable properties. Static type systems can prove the absence of certain run-time errors. For
+	instance, they can prove properties like: Booleans are never added to integers; private variables are not
+	accessed from outside their class; functions are applied to the right number of arguments; only strings
+	are ever added to a set of strings.
+	Other kinds of errors are not detected by today's static type systems. For instance, they will usually not
+	detect non-terminating functions, array bounds violations, or divisions by zero.
+
+
+Chapter 3
+A type annotation must follow every function parameter, preceded by a colon, because the Scala compiler does not infer function parameter types.
+The equals sign that precedes the body of a function hints that in the functional world view, a function defines an expression that results in a value
+A result type of Unit indicates the function returns no interesting value. Scala's Unit type is similar to Java's void type; in fact, every void-returning method in Java is mapped to a Unit-returning method in Scala. Methods with the result type of Unit, therefore, are only executed
+for their side effects.
+Note that Java's ++i and i++ don't work in Scala. To increment in Scala, you need to say either i = i + 1 or i += 1
+As mentioned previously, arrays in Scala are accessed by placing the index inside parentheses, not square brackets as in Java
+
+The first line of code in this for expression illustrates another general rule of Scala: if a method takes
+only one parameter, you can call it without a dot or parentheses. The to in this example is actually a
+method that takes one Int argument. The code 0 to 2 is transformed into the method call (0).to(2).
+[1] Note that this syntax only works if you explicitly specify the receiver of the method call. You
+cannot write "println 10", but you can write "Console println 10".
+
+When you apply parentheses surrounding one or more values to a variable, Scala will transform the code into an invocation of a method named apply on that variable.
+Similarly, when an assignment is made to a variable to which parentheses and one or more arguments have been applied, the compiler will transform that into an invocation of an update method that takes
+the arguments in parentheses as well as the object to the right of the equals sign.
+
+As you've seen, a Scala array is a mutable sequence of objects that all share the same type. An Array[String] contains only strings, for example. Although you can't change the length of an array
+after it is instantiated, you can change its element values. Thus, arrays are mutable objects.
+
+Perhaps the most common operator you'll use with lists is `::', which is pronounced "cons."Cons prepends a new element to the beginning of an existing list and returns the resulting list.
+In the expression "1 :: twoThree", :: is a method of its right operand, the list,twoThree. You might suspect there's something amiss with the associativityof the :: method, but it is actually a simple rule to
+remember: If a method is used in operator notation, such as a * b, the method is invoked on the left operand, as in a.*(b)—unless the method name ends in a colon. If the method name ends in a colon, the
+method is invoked on the right operand. Therefore, in 1 :: twoThree, the :: method is invoked on twoThree, passing in1, like this: twoThree.::(1). Operator associativity will be described in more
+detail in Section 5.9.
+Class List does offer an "append" operation—it's written :+ and is explained in Chapter 24—but this operation is rarely used, because the time it takes to append to a list grows linearly with the size of the
+list, whereas prepending with :: takes constant time. If you want to build a list efficiently by appending elements, you can prepend them and when you're done call reverse. Or you can use a ListBuffer, a
+mutable list that does offer an append operation, and when you're done call toList.
+
+For example, arrays are always mutable; lists are always immutable. Scala also provides mutable and immutable alternatives for sets and maps, but uses the same simple names for both versions. For sets and
+maps, Scala models mutability in the class hierarchy.
+
+To add a new element to a set, you call + on the set, passing in the new element. On both mutable and immutable sets, the + method will create and return a new set with the element added.
+
+!!!!! This -> method, which you can invoke on any object in a Scala program, returns a two-element tuple containing the key and value.
+
+!!! The telltale sign of a function with side effects is that its result type is Unit
+
+
+Chapter 4
+Classes and Objects
+
+Fields are also known as instance variables, because every instance gets its own set of the variables. Collectively, an object's instance variables make up the memory image of the object.
+
+The way you make members public in Scala is by not explicitly specifying any access modifier. Put another way, where you'd say "public" in Java, you simply say nothing in Scala. Public is Scala's default access level.
+
+Any parameters to a method can be used inside the method. One important characteristic of method parameters in Scala is that they are vals, not vars. If you attempt to reassign a parameter inside a method in Scala, therefore, it won't compile:
+
+As a result it is often better to explicitly provide the result types of public methods declared in a class even when the compiler would infer it for you.
+
+A method that is executed only for its side effects is known as a procedure.
+
+4.3 SINGLETON OBJECTS
+As mentioned in Chapter 1, one way in which Scala is more object-oriented than Java is that classes in Scala cannot have static members. Instead, Scala has singleton objects.
+When a singleton object shares the same name with a class, it is called that class's companion object.
+A class and its companion object can access each other's private members
+A singleton object is more than a holder of static methods, however. It is a first-class object. You can think of a singleton object's name, therefore, as a "name tag" attached to the object.
+Defining a singleton object doesn't define a type (at the Scala level of abstraction). Given just a definition of object ChecksumAccumulator, you can't make a variable of type ChecksumAccumulator.
+Rather, the type named ChecksumAccumulator is defined by the singleton object's companion class. However, singleton objects extend a superclass and can mix in traits. Given each singleton object is an
+instance of its superclasses and mixed-in traits, you can invoke its methods via these types, refer to it from variables of these types, and pass it to methods expecting these types.
+
+One difference between classes and singleton objects is that singleton objects cannot take parameters, whereas classes can. Because you can't instantiate a singleton object with the newkeyword, you have
+no way to pass parameters to it. Each singleton object is implemented asan instance of a synthetic class referenced from a static variable, so they have the same initialization semantics as Java statics.
+
+A singleton object that does not share the same name with a companion class is called astandalone object. You can use standalone objects for many purposes, including collecting related utility methods
+together or defining an entry point to a Scala application
+
+Scala implicitly imports members of packages java.lang and scala, as well as the members of a singleton object named Predef, into every Scala source file.
+
+5.3 STRING INTERPOLATION
+println(s"Hello, $name!")
+s"The answer is ${6 * 7}."
+Scala provides two other string interpolators by default: raw and f. The raw string interpolator behaves like s, except it does not recognize character literal escape sequences.
+println(raw"No\\\\escape!") // prints: No\\\\escape!
+The f string interpolator allows you to attach printf-style formatting instructions to embedded expressions.
+f"${math.Pi}%.5f"
+
+5.4 OPERATORS ARE METHODS
+operators are actually just a nice syntax for ordinary method calls
+Int contains several overloaded + methods that take different parameter types
+The + symbol is an operator—an infix operator to be specific. Operator notation is not limited to methods like + that look like operators in other languages. You can use any method in operator notation
+You can use indexOf as an operator: s indexOf 'o' // Scala invokes s.indexOf('o')         s indexOf ('o', 5) // Scala invokes s.indexOf('o', 5)
+
+
+ANY METHOD CAN BE AN OPERATOR
+In Scala operators are not special language syntax; any method can be an operator. What makes a
+method an operator is how you use it. When you write "s.indexOf('o')",indexOf is not an operator. But
+when you write "s indexOf 'o'", indexOf is an operator, because you're using it in operator notation.
+
+So far, you've seen examples of infix operator notation, which means the method to invoke sits between
+the object and the parameter (or parameters) you wish to pass to the method, as in "7 + 2". Scala also
+has two other operator notations: prefix and postfix. In prefix notation, you put the method name before
+the object on which you are invoking the method (for example, the `-' in -7). In postfix notation, you
+put the method after the object (for example, the "toLong" in "7 toLong").
+
+In contrast to the infix operator notation—in which operators take two operands, one to the left and the
+other to the right—prefix and postfix operators are unary: they take just one operand.
+
+As with the infix operators, these prefix operators are a shorthand way of invoking
+methods. In this case, however, the name of the method has "unary_" prepended to the operator
+character. For instance, Scala will transform the expression -2.0 into the method invocation
+"(2.0).unary_-"
+
+The only identifiers that can be used as prefix operators are +, -, !, and ~.
+Postfix operators are methods that take no arguments, when they are invoked without a dot or parentheses
+
+5.8 OBJECT EQUALITY
+If you want to compare two objects for equality, you can use either == or its inverse !=.
+As you see, == has been carefully crafted so that you get just the equality comparison you want in most
+cases. This is accomplished with a very simple rule: First check the left side for null. If it is not null,
+call the equals method. Since equals is a method, the precise comparison you get depends on the type
+of the left-hand argument.
+This kind of comparison will yield true on different objects, so long as their contents are the same and
+their equals method is written to be based on contents
+
+
+
+Chapter 6
+Functional Objects
+
+This initial Rational example highlights a difference between Java and Scala. In Java, classes have
+constructors, which can take parameters; whereas in Scala, classes can take parameters directly.
+The Scala compiler will compile any code you place in the class body, which isn't part of a field or a
+method definition, into the primary constructor.
+
+Auxiliary constructors in Scala start with def this(...).
+
+In Scala, every auxiliary constructor must invoke another constructor of the same class as its first
+action. In other words, the first statement in every auxiliary constructor in every Scala class will have
+the form "this(...)".
+
+In Java, a constructor must either invoke another constructor of the same class,
+or directly invoke a constructor of the superclass, as its first action. In a Scala class, only the primary
+constructor can invoke a superclass constructor
+
+Another thing to note is that given Scala's rules for operator precedence, which were described
+in Section 5.9, the * method will bind more tightly than the + method for Rationals. In other words,
+expressions involving + and * operations on Rationals will behave as expected.For
+example, x + x * y will execute as x + (x * y), not (x + x) * y
+
+6.10 IDENTIFIERS IN SCALA
+You have now seen the two most important ways to form an identifier in Scala: alphanumeric and
+operator. Scala has very flexible rules for forming identifiers. Besides the two forms you have seen
+there are also two others.
+
+A mixed identifier consists of an alphanumeric identifier, which is followed by an underscore and an
+operator identifier. For example, unary_+ used as a method name defines a unary +operator.
+
+A literal identifier is an arbitrary string enclosed in back ticks (` ...`). Some examples of literal
+identifiers are:
+`x` `<clinit>` `yield`
+A typical use case is accessing the static yieldmethod in
+Java's Thread class. You cannot write Thread.yield() because yield is a reserved word in Scala.
+However, you can still name the method in back ticks, e.g., Thread.`yield`().
+
+
+
+Chapter 7
+Built-in Control Structures
+
+
+The only control structures are if,while, for, try, match, and function calls.
+The reason Scala has so few is that it has included function literals since its inception.
+almost all of Scala's control structures result in some value
+
+The while and do-while constructs are called "loops," not expressions, because they don't result in an
+interesting value. The type of the result is Unit. It turns out that a value (and in fact, only one value)
+exists whose type is Unit. It is called the unit value and is written (). The existence of () is how
+Scala's Unit differs from Java's void
+
+Whereas in Java, assignment results in the value
+assigned (in this case a line from the standard input), in Scala assignment always results in the unit
+value, (). Thus, the value of the assignment "line = readLine()" will always be () and never be "".
+
+The syntax for catch clauses was chosen for its consistency with an important part of Scala: pattern matching
+
+As with most other Scala control structures, try-catch-finally results in a value
+
+If you're familiar with Java, it's worth noting that Scala's behavior differs from Java only because
+Java's try-finally does not result in a value. As in Java, if a finally clause includes an explicit return
+statement, or throws an exception, that return value or exception will "overrule" any previous one that
+originated in the try block or one of its catch clauses. For example, given this, rather contrived,
+function definition:
+def f(): Int = try return 1 finally return 2
+calling f() results in 2. By contrast, given:
+def g(): Int = try 1 finally 2
+calling g() results in 1.
+
+7.6 LIVING WITHOUT BREAK AND CONTINUE
+You may have noticed that there has been no mention of break or continue. Scala leaves out these
+commands because they do not mesh well with function literals
+
+
+If you're a Java programmer, you'll find that Scala's scoping rules are almost identical to Java's. One
+difference between Java and Scala is that Scala allows you to define variables of the same name in
+nested scopes.
+
+
+
+Chapter 8
+Functions and Closures
+
+Besides methods, which are functions that are members of some object, there are also functions
+nested within functions, function literals, and function values
+
+8.3 FIRST-CLASS FUNCTIONS
+Scala has first-class functions. Not only can you define functions and call them, but you can write
+down functions as unnamed literals and then pass them around as values.
+
+A function literal is compiled into a class that when instantiated at runtime is a function value.
+Thus the distinction between function literals and values is that function literals exist in the source code,
+whereas function values exist as objects at runtime. The distinction is much like that between classes
+(source code) and objects (runtime).
+(x: Int) => x + 1
+
+Function values are objects, so you can store them in variables if you like. They are functions, too, so
+you can invoke them using the usual parentheses function-call notation
+
+One way to make a function literal more brief is to leave off the parameter types.
+A second way to remove useless characters is to leave out parentheses around a parameter whose type
+is inferred
+To make a function literal even more concise, you can use underscores as placeholders for one or more
+parameters, so long as each parameter appears only one time within the function literal.
+
+Multiple underscores
+mean multiple parameters, not reuse of a single parameter repeatedly. The first underscore represents
+the first parameter, the second underscore the second parameter, the third underscore the third
+parameter, and so on
+
+
+
+8.6 PARTIALLY APPLIED FUNCTIONS
+someNumbers.foreach(println _)
+Thus, the underscore in this case is not a placeholder for a single parameter. It is a placeholder for an
+entire parameter list
+When you use an underscore in this way, you are writing a partially applied function. In Scala, when
+you invoke a function, passing in any needed arguments, you apply that functionto the arguments
+
+A partially applied function is an expression in which you don't supply all of the arguments needed by
+the function. Instead, you supply some, or none, of the needed arguments.
+
+Another way to think about this kind of expression, in which an underscore is used to represent an
+entire parameter list, is as a way to transform a def into a function value.
+
+Although you
+can't assign a method or nested function to a variable, or pass it as an argument to another function, you
+can do these things if you wrap the method or nested function in a function value by placing an
+underscore after its name.
+
+8.7 CLOSURES
+
+Intuitively, Scala's closures capture variables themselves, not the value to which variables refer.
+
+Scala supports repeated parameters, named arguments, and default arguments.
+
+Scala only optimizes directly recursive calls back
+to the same function making the call. If the recursion is indirect, as in the following example of two
+mutually recursive functions, no optimization is possible
+
+Chapter 9
+Control Abstraction
+
+These higher-order functions—functions that take functions as parameters—give you extra
+opportunities to condense and simplify code.
+One benefit of higher-order functions is they enable you to create control abstractions that allow you to
+reduce code duplication
+
+9.3 CURRYING
+
+
+A curried function is applied to multiple argument lists, instead of just one.
+
+9.4 WRITING NEW CONTROL STRUCTURES
+
+One way in which you can make the client code look a bit more like a built-in control structure is to use
+curly braces instead of parentheses to surround the argument list. In any method invocation in Scala in
+which you're passing in exactly one argument, you can opt to use curly braces to surround the argument
+instead of parentheses.
+
+def withPrintWriter(file: File, op: PrintWriter => Unit) = {
+val writer = new PrintWriter(file)
+try {
+op(writer)
+} finally {
+writer.close()
+}
+}
+Given such a method, you can use it like this:
+withPrintWriter(
+new File("date.txt"),
+writer => writer.println(new java.util.Date)
+)
+
+The advantage of using this method is that it's withPrintWriter, not user code, that assures the file is
+closed at the end. So it's impossible to forget to close the file. This technique is called the loan pattern,
+because a control-abstraction function, such as withPrintWriter, opens a resource and "loans" it to a
+function.
+
+The purpose of this ability to substitute curly braces for parentheses for passing in one argument is to
+enable client programmers to write function literals between curly braces. This can make a method call
+feel more like a control abstraction.
+9.5 BY-NAME PARAMETERS
+
+
+Chapter 10
+Composition and Inheritance
+
+10.3 DEFINING PARAMETERLESS METHODS
+
+abstract class Element {
+def contents: Array[String]
+def height: Int = contents.length
+def width: Int = if (height == 0) 0 else contents(0).length
+}
+Such parameterless methods are quite common in Scala. By contrast, methods defined with empty
+parentheses, such as def height(): Int, are called empty-paren methods
+The recommended convention is
+to use a parameterless method whenever there are no parameters and the method accesses mutable state
+only by reading fields of the containing object (in particular, it does not change mutable state). This
+convention supports the uniform access principle,[1] which says that client code should not be affected
+by a decision to implement an attribute as a field or method
+
+The two pairs of definitions are completely equivalent from a client's point of view. The only difference
+is that field accesses might be slightly faster than method invocations because the field values are precomputed
+when the class is initialized, instead of being computed on each method call. On the other
+hand, the fields require extra memory space in each Element object. So it depends on the usage profile
+of a class whether an attribute is better represented as a field or method, and that usage profile might
+change over time.
+
+To bridge that gap, Scala is very liberal when it comes to mixing parameterless and empty-paren
+methods. In particular, you can override a parameterless method with an empty-paren method, and vice
+versa. You can also leave off the empty parentheses on an invocation of any function that takes no
+arguments.
+!!!!!
+To summarize, it is encouraged in Scala to define methods that take no parameters and have no side
+effects as parameterless methods (i.e., leaving off the empty parentheses). On the other hand, you
+should never define a method that has side-effects without parentheses, because invocations of that
+method would then look like a field selection. So your clients might be surprised to see the side effects.
+Similarly, whenever you invoke a function that has side effects, be sure to include the empty
+parentheses when you write the invocation. Another way to think about this is if the function you're
+calling performs an operation, use the parentheses. But if it merely provides access to a property, leave
+the parentheses off.
+
+
+10.5 OVERRIDING METHODS AND FIELDS
+The uniform access principle is just one aspect where Scala treats fields and methods more uniformly
+than Java. Another difference is that in Scala, fields and methods belong to the same namespace. This
+makes it possible for a field to override a parameterless method. For instance, you could change the
+implementation of contents in class ArrayElement from a method to a field without having to modify
+the abstract method definition of contents in class Element,
+
+On the other hand, in
+Scala it is forbidden to define a field and method with the same name in the same class, whereas this is
+allowed in Java.
+
+Generally, Scala has just two namespaces for definitions in place of Java's four. Java's four namespaces
+are fields, methods, types, and packages. By contrast, Scala's two namespaces are:
+• values (fields, methods, packages, and singleton objects)
+• types (class and trait names)
+The reason Scala places fields and methods into the same namespace is precisely so you can override a
+parameterless method with a val, something you can't do with Java.[
+
+
+Chapter 12
+Traits
+
+Traits are a fundamental unit of code reuse in Scala. A trait encapsulates method and field definitions,
+which can then be reused by mixing them into classes. Unlike class inheritance, in which each class
+must inherit from just one superclass, a class can mix in any number of traits. This chapter shows you
+how traits work and shows two of the most common ways they are useful: widening thin interfaces to
+rich ones, and defining stackable modifications
+
+A trait also defines a type
+
+At this point you might philosophize that traits are like Java interfaces with concrete methods, but they
+can actually do much more. Traits can, for example, declare fields and maintain state. In fact, you can
+do anything in a trait definition that you can do in a class definition, and the syntax looks exactly the
+same, with only two exceptions
+
+First, a trait cannot have any "class" parameters (i.e., parameters passed to the primary constructor of a
+class)
+
+The other difference between classes and traits is that whereas in classes, super calls are statically
+bound, in traits, they are dynamically bound.
+
+If you write "super.toString" in a class, you know exactly
+which method implementation will be invoked. When you write the same thing in a trait, however, the
+method implementation to invoke for the super call is undefined when you define the trait. Rather, the
+implementation to invoke will be determined anew each time the trait is mixed into a concrete class.
+This curious behavior of super is key to allowing traits to work as stackable modifications, which will
+be described in Section 12.5. The rules for resolving super calls will be given in Section 12.6.
+
+12.5 TRAITS AS STACKABLE MODIFICATIONS
+You have now seen one major use of traits: turning a thin interface into a rich one. Now we'll turn to a
+second major use: providing stackable modifications to classes. Traits let youmodify the methods of a
+class, and they do so in a way that allows you to stack those modifications with each other.
+
+The order of mixins is significant.[2] The precise rules are given in the following section, but, roughly
+speaking, traits further to the right take effect first.
+When you call a method on a class with mixins, the
+method in the trait furthest to the right is called first. If that method calls super, it invokes the method in
+the next trait to its left, and so on
+
+
+
+
+Chapter 15
+Case Classes and Pattern Matching
+
+Classes with such a modifier are called case classes. Using the modifier makes the
+Scala compiler add some syntactic conveniences to your class.
+1. it adds a factory method with the name of the class. This means that, for instance, you can
+write Var("x") to construct a Var object, instead of the slightly longer new Var("x").
+2. All arguments in the parameter list of a case class implicitly get a val prefix, so they are maintained as fields.
+3. the compiler adds "natural" implementations of methods toString, hashCode, and equals to your class
+4. the compiler adds a copy method to your class for making modified copies. This method is useful for making a new instance of the class that is the same as another one except that one or two attributes are different
+```
+
+    Case class constructor parameters are public val fields by default, so accessor methods are generated for each parameter.
+    An apply method is created in the companion object of the class, so you don’t need to use the new keyword to create a new instance of the class.
+    An unapply method is generated, which lets you use case classes in more ways in match expressions.
+    A copy method is generated in the class. You may not use this feature in Scala/OOP code, but it’s used all the time in Scala/FP.
+    equals and hashCode methods are generated, which let you compare objects and easily use them as keys in maps.
+    A default toString method is generated, which is helpful for debugging.
+```
+
+The Scala standard is that an unapply method returns the case class constructor fields in a tuple that’s wrapped in an Option. The “tuple” part of the solution was shown in the previous lesson.
+
+Case objects
+
+A case object is like an object, but just like a case class has more features than a regular class, a case object has more features than a regular object. Its features include:
+
+    It’s serializable
+    It has a default hashCode implementation
+    It has an improved toString implementation
+
+Because of these features, case objects are primarily used in two places (instead of regular objects):
+
+    When creating enumerations
+    When creating containers for “messages” that you want to pass between other objects (such as with the Akka actors library)
+
+
+match compared to switch
+However, there are three differences to keep in mind: First, match is an expression in Scala (i.e., it
+always results in a value). Second, Scala's alternative expressions never "fall through" into the next
+case. Third, if none of the patterns match, an exception named MatchError is thrown
