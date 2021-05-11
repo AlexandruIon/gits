@@ -126,9 +126,8 @@ that at most one thread may own the lock. When thread A attempts to acquire a
 lock held by thread B, A must wait, or block, until B releases it. If B never releases
 the lock, A waits forever.
 
-clearer in Section 3.1.)
 
-Compound actions on shared state, such as incrementing a hit counter (readmodify-
+Compound actions on shared state, such as incrementing a hit counter (read-modify-
 write) or lazy initialization (check-then-act), must be made atomic to
 avoid race conditions. Holding a lock for the entire duration of a compound action
 can make that compound action atomic. However, just wrapping the compound
@@ -181,7 +180,6 @@ Because these
 counters constitute shared mutable state as well, we must use synchronization
 everywhere they are accessed. The portions of code that are outside the synchronized
 blocks operate exclusively on local (stack-based) variables, which are not
-2.5. Liveness and performance 31
 shared across threads and therefore do not require synchronization.
 
 
@@ -327,6 +325,16 @@ accessed.
 
 3.2 Publication and escape
 
+Publishing an object means making it available to code outside of its current scope,
+such as by storing a reference to it where other code can find it, returning it
+from a nonprivate method, or passing it to a method in another class. In many
+situations, we want to ensure that objects and their internals are not published.
+In other situations, we do want to publish an object for general use, but doing so
+in a thread-safe manner may require synchronization. Publishing internal state
+variables can compromise encapsulation and make it more difficult to preserve
+invariants; publishing objects before they are fully constructed can compromise
+thread safety.
+
 3.2.1 Safe construction practices
 
 But an object is in a predictable,
@@ -380,7 +388,7 @@ you are confining the modification to a single thread to prevent race conditions
 and the visibility guarantees for volatile variables ensure that other threads see
 the most up-to-date value.
 Because of its fragility, ad-hoc thread confinement should be used sparingly;
-if possible, use one of the stronger forms of thread confinment (stack confinement
+if possible, use one of the stronger forms of thread confinement (stack confinement
 or ThreadLocal) instead.
 
 3.3.2 Stack confinement
@@ -599,7 +607,137 @@ compound actions such as put-if-absent, replace, and conditional remove.
 Replacing synchronized collections with concurrent collections can offer
 dramatic scalability improvements with little risk.
 
+Java 5.0 also adds two new collection types, Queue and BlockingQueue. A
+Queue is intended to hold a set of elements temporarily while they await processing.
+Several implementations are provided, including ConcurrentLinkedQueue, a
+traditional FIFO queue, and PriorityQueue, a (non concurrent) priority ordered
+queue. Queue operations do not block; if the queue is empty, the retrieval operation
+returns null. While you can simulate the behavior of a Queue with a List—in
+fact, LinkedList also implements Queue—the Queue classes were added because
+eliminating the random-access requirements of List admits more efficient concurrent
+implementations.
+
+BlockingQueue extends Queue to add blocking insertion and retrieval operations.
+If the queue is empty, a retrieval blocks until an element is available, and
+if the queue is full (for bounded queues) an insertion blocks until there is space
+available. Blocking queues are extremely useful in producer-consumer designs,
+and are covered in greater detail in Section 5.3.
+
+5.2.1 ConcurrentHashMap
+
+ConcurrentHashMap is a hash-based Map like HashMap, but it uses an entirely
+different locking strategy that offers better concurrency and scalability. Instead
+of synchronizing every method on a common lock, restricting access to a single
+thread at a time, it uses a finer-grained locking mechanism called lock striping
+(see Section 11.4.3) to allow a greater degree of shared access. Arbitrarily many
+reading threads can access the map concurrently, readers can access the map
+concurrently with writers, and a limited number of writers can modify the map
+concurrently. The result is far higher throughput under concurrent access, with
+little performance penalty for single-threaded access.
+
+ConcurrentHashMap, along with the other concurrent collections, further improve
+on the synchronized collection classes by providing iterators that do not
+throw ConcurrentModificationException, thus eliminating the need to lock the
+collection during iteration. The iterators returned by ConcurrentHashMap are
+weakly consistent instead of fail-fast. A weakly consistent iterator can tolerate concurrent
+modification, traverses elements as they existed when the iterator was
+constructed, and may (but is not guaranteed to) reflect modifications to the collection
+after the construction of the iterator.
+
+As with all improvements, there are still a few tradeoffs. The semantics of
+methods that operate on the entire Map, such as size and isEmpty, have been
+slightly weakened to reflect the concurrent nature of the collection. Since the
+result of size could be out of date by the time it is computed, it is really only
+an estimate, so size is allowed to return an approximation instead of an exact
+count.
+
+The one feature offered by the synchronized Map implementations but not by
+ConcurrentHashMap is the ability to lock the map for exclusive access. With Hashtable
+and synchronizedMap, acquiring the Map lock prevents any other thread
+from accessing it.
+
+5.2.2 Additional atomic Map operations
+Since a ConcurrentHashMap cannot be locked for exclusive access, we cannot use
+client-side locking to create new atomic operations such as put-if-absent, as we
+did for Vector in Section 4.4.1. Instead, a number of common compound operations
+such as put-if-absent, remove-if-equal, and replace-if-equal are implemented
+as atomic operations and specified by the ConcurrentMap interface
+
+5.2.3 CopyOnWriteArrayList
+
+The copy-on-write collections derive their thread safety from the fact that as
+long as an effectively immutable object is properly published, no further synchronization
+is required when accessing it. They implement mutability by creating
+and republishing a new copy of the collection every time it is modified. Iterators
+for the copy-on-write collections retain a reference to the backing array that was
+current at the start of iteration, and since this will never change, they need to
+synchronize only briefly to ensure visibility of the array contents.
+
+The iterators returned by the
+copy-on-write collections do not throw ConcurrentModificationException and
+return the elements exactly as they were at the time the iterator was created,
+regardless of subsequent modifications.
+
+Obviously, there is some cost to copying the backing array every time the
+collection is modified, especially if the collection is large; the copy-on-write collections
+are reasonable to use only when iteration is far more common than modification.
+This criterion exactly describes many event-notification systems: delivering
+a notification requires iterating the list of registered listeners and calling
+each one of them, and in most cases registering or unregistering an event listener
+is far less common than receiving an event notification.
+
+5.3 Blocking queues and the producer-consumer pattern
+
+Blocking queues provide blocking put and take methods as well as the timed
+equivalents offer and poll. If the queue is full, put blocks until space becomes
+available; if the queue is empty, take blocks until an element is available. Queues
+can be bounded or unbounded; unbounded queues are never full, so a put on an
+unbounded queue never blocks.
+Blocking queues support the producer-consumer design pattern.
+One of the
+most common producer-consumer designs is a thread pool coupled with a work
+queue; this pattern is embodied in the Executor task execution framework.
+
+Blocking queues also provide an offer method, which returns a failure status
+if the item cannot be enqueued. This enables you to create more flexible policies
+for dealing with overload, such as shedding load, serializing excess work items
+and writing them to disk, reducing the number of producer threads, or throttling
+producers in some other manner.
+
+Bounded queues are a powerful resource management tool for building
+reliable applications: they make your program more robust to overload
+by throttling activities that threaten to produce more work than can be
+handled.
+
+5.3.2 Serial thread confinement
+
+The blocking queue implementations in java.util.concurrent all contain sufficient
+internal synchronization to safely publish objects from a producer thread to
+the consumer thread.
+
+5.3.3 Deques and work stealing
+Java 6 also adds another two collection types, Deque (pronounced “deck”) and
+BlockingDeque, that extend Queue and BlockingQueue. A Deque is a doubleended
+queue that allows efficient insertion and removal from both the head and
+the tail. Implementations include ArrayDeque and LinkedBlockingDeque.
+
+Just as blocking queues lend themselves to the producer-consumer pattern,
+deques lend themselves to a related pattern called work stealing. A producer-consumer
+design has one shared work queue for all consumers; in a work stealing
+design, every consumer has its own deque. If a consumer exhausts the work in its
+own deque, it can steal work from the tail of someone else’s deque. Work stealing
+can be more scalable than a traditional producer-consumer design because workers
+don’t contend for a shared work queue; most of the time they access only their
+own deque, reducing contention. When a worker has to access another’s queue,
+it does so from the tail rather than the head, further reducing contention.
+
 5.4 Blocking and interruptible methods
+
+The put and take methods of BlockingQueue throw the checked InterruptedException,
+as do a number of other library methods such as Thread.sleep.
+When a method can throw InterruptedException, it is telling you that it is a
+blocking method, and further that if it is interrupted, it will make an effort to stop
+blocking early.
 
 Interruption is a cooperative mechanism. One thread cannot force another to
 stop what it is doing and do something else; when thread A interrupts thread B, A
@@ -754,6 +892,11 @@ safe publication of both objects to the other party.
 Chapter 6
 Task Execution
 
+Most concurrent applications are organized around the execution of tasks: abstract,
+discrete units of work. Dividing the work of an application into tasks
+simplifies program organization, facilitates error recovery by providing natural
+transaction boundaries, and promotes concurrency by providing a natural structure
+for parallelizing work.
 
 6.1 Executing tasks in threads
 
@@ -854,7 +997,7 @@ threads. A thread pool is tightly bound to a work queue holding tasks waiting to
 be executed. Worker threads have a simple life: request the next task from the
 work queue, execute it, and go back to waiting for another task.
 
-Executing tasks in pool threads has a number of advantages over the threadper-
+Executing tasks in pool threads has a number of advantages over the thread per-
 task approach.Reusing an existing thread instead of creating a new one
 amortizes thread creation and teardown costs over multiple requests. As an
 added bonus, since the worker thread often already exists at the time the request
@@ -982,7 +1125,7 @@ a timeout of zero. This is possible, but tedious. Fortunately there is a better 
 a completion service.
 
 CompletionService combines the functionality of an Executor and a BlockingQueue.
-You can submit Callable tasks to it for execution and use the queuelike
+You can submit Callable tasks to it for execution and use the queue like
 methods take and poll to retrieve completed results, packaged as Futures,
 as they become available. ExecutorCompletionService implements Completion-
 Service, delegating the computation to an Executor.
