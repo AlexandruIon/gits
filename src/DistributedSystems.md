@@ -35,7 +35,7 @@ operating systems from each application.</br>
 In a sense, middleware is the same to a distributed system as what an operating system is to a computer: a manager of resources offering its applications
 to efficiently share and deploy those resources across a network.
 Next to resource management, it offers services that can also be found in most operating systems, including:
-* Facilities for interapplication communication.
+* Facilities for inter-application communication.
 * Security services.
 * Accounting services.
 * Masking of and recovery from failures.</br>
@@ -150,15 +150,68 @@ We make a distinction between
 * pervasive systems (which are naturally distributed)
 
 ### High performance distributed computing
+* Cluster computing - similar underlying hardware, closely connected by means of a high-speed local-area network. Same OS
+* Grid computing - federation of computer systems (fall under a different administrative domain) and may be different when it comes to hardware/software/network topology.
+
+From the perspective of grid computing, a next logical step is to simply _outsource_ the entire infrastructure that is needed for compute-intensive applications.
+In essence, this is what **cloud computing** is all about: providing the facilities to dynamically construct an infrastructure and compose what
+is needed from available services. Unlike grid computing, which is strongly associated with high-performance computing, cloud computing is much more
+than just providing lots of resources.
+
+#### Note - Parallel processing
+High-performance computing more or less started with the introduction of **multiprocessor machines**. In this case, multiple CPUs are organized in such a way
+that they all have access to the same physical memory.</br>
+In contrast, in a **multicomputer system** several computers are connected through a network and there is no sharing of main memory.
+![Multiprocessor vs Multicomputer architectures](../misc/distributed_systems/c1/fig1_6.png)
+
+This shift also meant that many programs had to make use of message passing instead of modifying shared data as a means of communication and synchronization between threads
+Unfortunately, message-passing models have proven to be much more difficult and error-prone compared to the shared-memory programming models.
+
+#### Cluster computing
+It became financially and technically attractive to build a supercomputer using off-the-shelf technology by simply hooking up a collection of relatively simple computers in a high-speed network.
+In virtually all cases, cluster computing is used for **parallel programming in which a single** (compute intensive) **program is run in parallel on multiple machines**.
+![Cluster computing](../misc/distributed_systems/c1/fig1_7.png)
+Each cluster consists of a collection of compute nodes that are controlled and accessed by means of a single master node. The master typically
+handles the allocation of nodes to a particular parallel program, maintains a batch queue of submitted jobs, and provides an interface for the users of
+the system. As such, the master actually runs the middleware needed for the execution of programs and management of the cluster, while the compute
+nodes are equipped with a standard operating system extended with typical middleware functions for communication, storage, fault tolerance, and so on.
+Apart from the master node, the compute nodes are thus seen to be highly identical.
+
+#### Grid computing
+A characteristic feature of traditional **cluster computing is its homogeneity**.</br>
+In grid computing systems: no assumptions are made concerning similarity of hardware, operating systems, networks, administrative domains, security policies, etc.</br>
+A key issue in a grid-computing system is that resources from different organizations are brought together to allow the collaboration of a group of
+people from different institutions, indeed forming a federation of systems. Such a collaboration is realized in the form of a **virtual organization**.</br>
+Given its nature, much of the software for realizing grid computing evolves around providing access to resources from different administrative domains,
+and to only those users and applications that belong to a specific virtual organization. For this reason, focus is often on architectural issues.
+![Grid computing](../misc/distributed_systems/c1/fig1_8.png)
+* fabric layer - interfaces to local resources at a specific site. (query the state and capabilities of a resource + resource management (locking resources))
+* connectivity layer - communication protocols for supporting grid transactions that span the usage of multiple resources(protocols to transfer data/ access resources)
+* resource layer - is responsible for managing a single resource - it uses the connectivity layer and calls directly the fabric layer interfaces 
+* collective layer - handles access to multiple resources (resource discovery/allocation/scheduling of tasks/data replication)
+* application layer - apps that operate within a virtual org</br>
+Typically the collective, connectivity, and resource layer form the heart of what could be called a grid middleware layer.
+These layers jointly provide access to and management of resources that are potentially dispersed across multiple sites.
+
+#### Cloud computing
+**utility computing** by which a customer could upload tasks to a data center and be charged on a per-resource basis. Utility
+computing formed the basis for what is now called **cloud computing**.</br>
+Cloud computing is characterized by an easily usable and accessible pool of virtualized resources.The link to utility computing is formed by the fact that cloud
+computing is generally based on a pay-per-use model in which guarantees are offered by means of customized service level agreements (SLAs).
+![cloud computing](../misc/distributed_systems/c1/fig1_9.png)
+Clouds are organized in 4 layers:
+* Hardware - at data center level
+* Infrastructure - it deploys virtualization techniques (virtual storage and computing resources)
+* Platform - 
+* Application</br>
+Cloud-computing providers offer these layers to their customers through various interfaces
+* IaaS (hardware/infrastructure layer)
+* PaaS (platform layer)
+* SaaS (app layer)
+
+### Distributed information systems
+It is found in organizations that were confronted with a wealth of networked applications, but for which interoperability turned out to be a painful experience. Many of the existing
+middleware solutions are the result of working with an infrastructure in which it was easier to integrate applications into an enterprise-wide information system.</br>
 
 
-
-
-
-
-
-
-
-
-
-
+### Pervasive systems
