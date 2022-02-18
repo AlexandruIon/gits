@@ -5,6 +5,7 @@
   * [1.1 What is a distributed system?](#1.1-What-is-a-distributed-system?)
   * [1.2 Design goals](#1.2-Design-goals)
   * [1.3 Types of distributed systems](#1.3-Types-of-distributed-systems)
+* [Architectures](#architectures)
 * [Setup](#setup)
 
 # Introduction
@@ -210,8 +211,113 @@ Cloud-computing providers offer these layers to their customers through various 
 * SaaS (app layer)
 
 ### Distributed information systems
-It is found in organizations that were confronted with a wealth of networked applications, but for which interoperability turned out to be a painful experience. Many of the existing
+It is found in organizations that were confronted with a wealth of networked applications (servers+databases), but for which interoperability turned out to be a painful experience. Many of the existing
 middleware solutions are the result of working with an infrastructure in which it was easier to integrate applications into an enterprise-wide information system.</br>
+We can distinguish several levels at which integration can take place. Integration at the lowest level allows clients to wrap a number of requests, possibly for different
+servers, into a single larger request and have it executed as a distributed transaction. The key idea is that all, or none of the requests are executed.</br>
 
+As applications became more sophisticated and were gradually separated into independent components (notably distinguishing database components
+from processing components), it became clear that integration should also take place by letting applications communicate directly with each other. This
+has now lead to a huge industry that concentrates on Enterprise Application Integration (EAI).
+
+#### Distributed transaction processing
+we concentrate on database applications. operations on a database are carried out in the form of **transactions**. Programming
+using transactions requires special primitives that must either be supplied by the underlying distributed system or by the language runtime
+system. In a mail system, there might be primitives to send, receive, and forward mail.</br>
+Ordinary statements, procedure calls, and so on, are also allowed inside a transaction. In particular, **remote procedure calls**
+(**RPC**s), that is, procedure calls to remote servers, are often also encapsulated in a transaction, leading to what is known as a **transactional RPC**.
+![Primitives for transaction](../misc/distributed_systems/c1/fig1_10.png)
+In distributed systems, transactions are often constructed as a number of subtransactions, jointly forming a **nested transaction**.
+The top-level transaction may fork off children that run in parallel with one another, on different machines, to gain performance or simplify programming.
+Each of these children may also execute one or more subtransactions, or fork off its own children.
+![Nested transaction](../misc/distributed_systems/c1/fig1_11.png)
+Nested transactions are important in distributed systems, for they provide a natural way of distributing a transaction across multiple machines. They
+follow a logical division of the work of the original transaction.</br>
+In the early days of enterprise middleware systems, the component that handled distributed (or nested) transactions formed the core for integrating
+applications at the server or database level. This component was called a **transaction processing monitor** or **TP monitor** for short. Its main task was
+to allow an application to access multiple server/databases by offering it a transactional programming model, as shown in Figure 1.12. Essentially, the TP
+monitor coordinated the commitment of subtransactions following a standard protocol known as **distributed commit**.
+![TP monitor](../misc/distributed_systems/c1/fig1_12.png)
+An important observation is that applications wanting to coordinate several subtransactions into a single transaction did not have to implement this
+coordination themselves. This is exactly where middleware comes into play: it implements services that are useful for many applications avoiding that
+such services have to be reimplemented over and over again by application developers
+
+#### Enterprise application integration
+The more applications became decoupled from the databases they were built upon, the more evident it became that facilities were needed
+to integrate applications independently from their databases. In particular, application components should be able to communicate directly with each other
+and not merely by means of the request/reply behavior that was supported by transaction processing systems.</br>
+The main idea was that existing applications could directly exchange information.
+![Middleware as communication](../misc/distributed_systems/c1/fig1_12.png)
+Several types of communication middleware exist. With remote procedure calls (RPC), an application component can effectively send a request to another
+application component by doing a local procedure call, which results in the request being packaged as a message and sent to the callee. Likewise, the
+result will be sent back and returned to the application as the result of the procedure call.
+As the popularity of object technology increased, techniques were developed to allow calls to remote objects, leading to what is known as **remote method invocations (RMI)**.
+An RMI is essentially the same as an RPC, except that it **operates on objects instead of functions**.</br>
+RPC and RMI have the disadvantage that the caller and callee both need to be up and running at the time of communication. In addition, they need
+to know exactly how to refer to each other. This tight coupling is often experienced as a serious drawback, and has lead to what is known as **message-oriented
+middleware**, or simply **MOM**. In this case, applications send messages to logical contact points, often described by means of a subject. Likewise,
+applications can indicate their interest for a specific type of message, after which the communication middleware will take care that those messages are
+delivered to those applications. These so-called **publish/subscribe** systems form an important and expanding class of distributed systems.
+
+##### Enterprise application integration - on integrating apps
+Supporting enterprise application integration is an important goal for many middleware products.
+* File transfer (drawback - file format and layout, file management, update propagation-notification of clients aka trigger)
+* Shared database (better than file transfer. drawback - design common data schema, many reads/updates leads to performance bottleneck)
+* Remote procedure call 
+  * In such cases it is not really the change of data that is important, but the execution of a series of actions)
+  * In essence, an RPC allows an application A to make use of the information available only to application B, without giving A direct access  to that information
+* Messaging
+  * A main drawback of RPCs is that caller and callee need to be up and running at the same time in order for the call to succeed. However, in
+    many scenarios this simultaneous activity is often difficult or impossible to guarantee.</br>
+  
+Middleware (in the form of a distributed system), however, can significantly help in integration by providing the right facilities such as support for RPCs or messaging.
 
 ### Pervasive systems
+The distributed systems discussed so far are largely characterized by their stability: nodes are fixed and have a more or less permanent and high-quality
+connection to a network.</br>
+However, matters have changed since the introduction of mobile and embedded computing devices, leading to what are generally referred to as **pervasive systems**.
+As its name suggests, pervasive systems are intended to naturally blend into our environment.</br>
+What makes them unique in comparison to the computing and information systems described so far, is that the separation between users and system
+components is much more blurred. There is often no single dedicated interface, such as a screen/keyboard combination. Instead, a pervasive system is often
+equipped with many **sensors** that pick up various aspects of a user’s behavior. Likewise, it may have a myriad of **actuators** to provide information and
+feedback, often even purposefully aiming to steer behavior.</br>
+Three different types of pervasive systems:
+* Ubiquitous computing systems (present, appearing, or found everywhere.)
+* Mobile systems
+* sensor networks
+
+#### Ubiquitous computing systems
+In a ubiquitous computing system we go one step further: the system is pervasive and continuously present. The latter means that a user will be continuously
+interacting with the system, often not even being aware that interaction is taking place.</br>
+Core requirements for a ubiquitous computing system:
+* (Distribution) Devices are networked, distributed, and accessible in a transparent manner
+* (Interaction) Interaction between users and devices is highly unobtrusive
+* (Context awareness) The system is aware of a user’s context in order to optimize interaction
+* (Autonomy) Devices operate autonomously without human intervention, and are thus highly self-managed
+* (Intelligence) The system as a whole can handle a wide range of dynamic actions and interactions
+
+# Architectures
+Make a distinction between, on the one hand, the **logical organization** of the collection of software components, and on the other hand the actual **physical realization**.</br>
+The organization of distributed systems is mostly about the software components that constitute the system. These **software architectures** tell us
+how the various software components are to be organized and how they should interact.</br>
+An important goal of distributed systems is to separate applications from underlying platforms by providing a **middleware layer**. Adopting such a layer
+is an important architectural decision, and its main purpose is to provide distribution transparency.</br>
+The actual realization of a distributed system requires that we instantiate and place software components on real machines.
+The final instantiation of a software architecture is also referred to as a **system architecture**.
+
+## 2.1 Architectural styles
+Considering the logical organization of a distributed system into software components, also referred to as its **software architecture**.</br>
+An **architectural style** is important. Such a style is formulated in terms of components, the way that components are connected to each other, the data exchanged between components, and finally
+how these elements are jointly configured into a system.</br> 
+A **component** is a modular unit with well-defined required and provided **interfaces** that is _replaceable_ within its environment.</br>
+A **connector**, which is generally described as a mechanism that mediates communication, coordination, or cooperation among components.(flow of control and data between components)</br>
+Using components and connectors, we can come to various configurations, which, in turn, have been classified into architectural styles:
+* Layered architectures
+* Object-based architectures
+* Resource-centered architectures
+* Event-based architectures
+
+### Layered architectures
+The basic idea for the layered style is simple: components are organized in a layered fashion where a component at layer Lj can make a **downcall** to
+a component at a lower-level layer Li (with i < j) and generally expects a response. Only in exceptional cases will an **upcall** be made to a higher-level component.
+![Layered Architecture](../misc/distributed_systems/c2/fig2_1.png)
