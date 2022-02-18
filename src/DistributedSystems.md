@@ -321,3 +321,104 @@ Using components and connectors, we can come to various configurations, which, i
 The basic idea for the layered style is simple: components are organized in a layered fashion where a component at layer Lj can make a **downcall** to
 a component at a lower-level layer Li (with i < j) and generally expects a response. Only in exceptional cases will an **upcall** be made to a higher-level component.
 ![Layered Architecture](../misc/distributed_systems/c2/fig2_1.png)
+Figure 2.1(a) shows a standard organization in which only downcalls to the next lower layer are made. This organization is commonly deployed in the case of **network communication**.</br>
+Finally, a special situation is shown in Figure 2.1(c). In some cases, it is convenient to have a lower layer do an upcall to its next higher layer. A typical example is when an operating system signals the occurrence of an
+event, to which end it calls a user-defined operation for which an application had previously passed a reference (typically referred to as a handle).
+
+#### Layered communication protocols
+A well-known and ubiquitously applied layered architecture is that of so called **communication-protocol stacks**.</br>
+In communication-protocol stacks, each layer implements one or several **communication services** allowing data to be sent from a destination to one
+or several targets. To this end, each layer offers an interface specifying the functions that can be called.
+![Layered Communication protocol stack](../misc/distributed_systems/c2/fig2_2.png)
+
+#### Application layering
+Logical layering of applications:
+* The application-interface level
+* The processing level
+* The data level
+
+### Object-based and service-oriented architectures
+In essence, each object corresponds to what we have defined as a component, and these components are connected through a procedure call mechanism.
+In the case of distributed systems, a procedure call can also take place over a network, that is, the calling object need not be executed on the same machine as the called object.
+![Object Based arch style](../misc/distributed_systems/c2/fig2_5.png)
+Object-based architectures are attractive because they provide a natural way of encapsulating data (called an object’s state) and the operations that can
+be performed on that data (which are referred to as an object’s methods) into a single entity. The **interface** offered by an object conceals implementation
+details, essentially meaning that we, in principle, can consider an object completely independent of its environment.</br>
+This separation between interfaces and the objects implementing these interfaces allows us to place an interface at one machine, while the object itself
+resides on another machine. This organization, which is shown in Figure 2.6 is commonly referred to as a **distributed object**.
+![Remote Object](../misc/distributed_systems/c2/fig2_6.png)
+When a client **binds** to a distributed object, an implementation of the object’s interface, called a **proxy**, is then loaded into the client’s address space.
+A proxy is analogous to a client stub in RPC systems. The only thing it does is marshal method invocations into messages and unmarshal reply messages
+to return the result of the method invocation to the client. The actual object resides at a server machine, where it offers the same interface as it does on the client machine.</br>
+A characteristic, but somewhat counterintuitive feature of most distributed objects is that their state is not distributed: it resides at a single machine.
+Only the interfaces implemented by the object are made available on other machines. Such objects are also referred to as **remote objects**.
+One could argue that object-based architectures form the foundation of encapsulating services into independent units. **Encapsulation** is the keyword
+here: the service as a whole is realized as a self-contained entity, although it can possibly make use of other services. By clearly separating various services
+such that they can operate independently, we are paving the road toward **service-oriented architectures**, generally abbreviated as **SOA**s.</br>
+In a service-oriented architecture, a distributed application or system is essentially constructed as a composition of many different services.</br>
+The problem of developing a distributed system is partly one of **service composition**.
+
+### Resource-based architectures
+One of the problems with **service composition** is that connecting various components can easily turn into an **integration** nightmare.</br>
+As an alternative, one can also view a distributed system as a huge **collection of resources** that are individually managed by components.
+This approach has now been widely adopted for the Web and is known as **Representational State Transfer (REST)** Characteristics:
+* Resources are identified through a single naming scheme
+* All services offer the same interface, consisting of at most four operation
+* Messages sent to or from a service are fully self-described
+* After executing and operation at a service, that component forgets everything about the caller (**stateless execution**)
+![Rest operations](../misc/distributed_systems/c2/fig2_7.png)
+The RESTful architecture has become popular because of its simplicity. whether RESTful services are better than where services are specified by means of **service-specific interfaces**. 
+The simplicity of RESTful architectures can easily prohibit easy solutions to intricate communication schemes. One example is where distributed transactions are needed, which generally requires that services keep track of
+the state of execution. On the other hand, there are many examples in which RESTful architectures perfectly match a simple integration scheme of services,yet where the myriad of service interfaces will complicate matters.
+
+### Publish-subscribe architectures
+Architecture in which dependencies between processes become as loose as possible.
+Architecture in which there is a strong separation between **processing** and **coordination**.
+The idea is to view a system as a collection of autonomously operating processes. In this model, **coordination** encompasses
+the **communication** and **cooperation** between processes.
+![Coordination](../misc/distributed_systems/c2/fig2_9.png)
+Shared data spaces are often combined with event-based coordination: a process subscribes to certain tuples by providing a search pattern; when a
+process inserts a tuple into the data space, matching subscribers are notified. In both cases, we are dealing with a publish-subscribe architecture.
+![EventBased/SharedDataspace architectural style](../misc/distributed_systems/c2/fig2_10.png)
+We have also shown an abstraction of the mechanism by which publishers and subscribers are matched, known as an **event bus**.</br>
+An important aspect of publish-subscribe systems is that communication takes place by describing the events that a subscriber is interested in. As a consequence, naming plays a crucial role.
+![Publisher/Subscriber](../misc/distributed_systems/c2/fig2_12.png)
+Clearly, in publish-subscribe systems such as these, the crucial issue is the efficient and scalable implementation of matching subscriptions to notifications.
+
+
+## 2.2 Middleware organization
+Actual organization of middleware, that is, independent of the overall organization of a distributed system or application.
+There are two important types of **design patterns** that are often applied to the organization of middleware: **wrappers** and **interceptors**.
+Each targets different problems, yet addresses the same goal for middleware: **achieving openness**.
+
+### Wrappers
+Enterprise application integration could be established through middleware as a communication facilitator, but there we still implicitly assumed that, in the end, components could be accessed through their native interfaces.</br>
+A wrapper or adapter is a special component that offers an interface acceptable to a client application, of which the functions are transformed into those available at the component. In essence, it solves the problem of **incompatible interfaces**.</br>
+
+Again, facilitating a reduction of the number of wrappers is typically done through middleware. One way of doing this is implementing a so called
+**broker**, which is logically a centralized component that handles all the accesses between different applications. An often-used type is a **message broker**
+In the case of a message broker, applications simply send requests to the broker containing information on what they need. The broker, having knowledge of all relevant
+applications, contacts the appropriate applications, possibly combines and transforms the responses and returns the result to the initial application.
+![Wrapper vs Broker](../misc/distributed_systems/c2/fig2_13.png)
+
+### Interceptors
+Conceptually, an **interceptor** is nothing but a software construct that will break the usual flow of control and allow other (application specific) code to be executed.
+Interceptors are a primary means for adapting middleware to the specific needs of an application.</br>
+To make matters concrete, consider interception as supported in many object-based distributed systems.
+![Interceptor to handle remote invocations](../misc/distributed_systems/c2/fig2_14.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
