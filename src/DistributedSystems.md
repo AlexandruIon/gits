@@ -339,7 +339,7 @@ Logical layering of applications:
 
 ### Object-based and service-oriented architectures
 In essence, each object corresponds to what we have defined as a component, and these components are connected through a procedure call mechanism.
-In the case of distributed systems, a procedure call can also take place over a network, that is, the calling object need not be executed on the same machine as the called object.
+In the case of distributed systems, a procedure call can also take place over a network, that is, the calling object need not be executed on the same machine as the called object.</br>
 ![Object Based arch style](../misc/distributed_systems/c2/fig2_5.png)
 Object-based architectures are attractive because they provide a natural way of encapsulating data (called an object’s state) and the operations that can
 be performed on that data (which are referred to as an object’s methods) into a single entity. The **interface** offered by an object conceals implementation
@@ -408,8 +408,108 @@ To make matters concrete, consider interception as supported in many object-base
 ![Interceptor to handle remote invocations](../misc/distributed_systems/c2/fig2_14.png)
 
 
+### Modifiable middleware
+What wrappers and interceptors offer are means to extend and adapt the middleware. The need for adaptation comes from the fact that the environment
+in which distributed applications are executed changes continuously. Changes include those resulting from mobility, a strong variance in the quality-ofservice
+of networks, failing hardware, and battery drainage, amongst others. Rather than making applications responsible for reacting to changes, this task
+is placed in the middleware. Moreover, as the size of a distributed system increases, changing its parts can rarely be done by temporarily shutting it
+down. What is needed is being able to make changes on-the-fly.
 
+## 2.3 System architecture
+How many distributed systems are actually organized by considering where software components are placed.</br>
+Deciding on software components, their interaction, and their placement leads to an instance of a software architecture, also known as a **system architecture**.</br>
 
+### Centralized organizations
+Thinking in terms of **clients** that request services from servers helps understanding and managing the complexity of distributed systems.
+
+#### Simple client-server architecture
+This client-server interaction, also known as request-reply behavior is shown in Figure 2.15 in the form of a message sequence chart.
+![Request Replay](../misc/distributed_systems/c2/fig2_15.png)
+Communication between a client and a server can be implemented by means of a simple connectionless protocol when the underlying network is
+fairly reliable as in many local-area networks.</br>
+Using a **connectionless** protocol has the obvious advantage of being efficient.As long as messages do not get lost or corrupted, the request/reply protocol just sketched works fine.</br>
+When an operation can be repeated multiple times without harm, it is said to be idempotent.</br>
+As an alternative, many client-server systems use a reliable **connection oriented** protocol. Although this solution is not entirely appropriate in a local-area network due to relatively low performance, it works perfectly fine
+in wide-area systems in which communication is inherently unreliable.(reliable TCP/IP connections).In this case, whenever a client requests a service, it firstsets up a connection to the server before sending the request. The server generally uses that same connection to send the reply message, after which
+the connection is torn down. The trouble may be that setting up and tearing down a connection is relatively costly, especially when the request and reply messages are small. </br>
+
+#### Multitiered architectures
+The distinction into three logical levels as discussed so far, suggests a number of possibilities for physically distributing a client-server application across several machines.
+We make a distinction between only two kinds of machines: **client machines** and **server machines**, leading to what is also referred to as a **(physically) two-tiered architecture**.
+![Tow Tiered architecture](../misc/distributed_systems/c2/fig2_16.png)
+When distinguishing only client and server machines as we did so far, we miss the point that a server may sometimes need to act as a client, as shown
+in Figure 2.17, leading to a **(physically) three-tiered architecture**.</br>
+These organizations are used where the client machine is a PC or workstation, connected through a network to a distributed file system or database. Essentially, most of the
+application is running on the client machine, but all operations on files or database entries go to the server. For example, many banking applications
+run on an end-user’s machine where the user prepares transactions and such.</br>
+![Sever acting as a client](../misc/distributed_systems/c2/fig2_17.png)
+In this architecture, traditionally programs that form part of the processing layer are executed by a separate server, but may additionally be partly
+distributed across the client and server machines. A typical example of where a three-tiered architecture is used is in transaction processing. A separate
+process, called the **transaction processing monitor**, coordinates all transactions across possibly different data servers.</br>
+Another, but very different example were we often see a three-tiered architecture is in the organization of Web sites. In this case, a Web server acts
+as an entry point to a site, passing requests to an application server where the actual processing takes place. This application server, in turn, interacts with a
+database server. For example, an application server may be responsible for running the code to inspect the available inventory of some goods as offered
+by an electronic bookstore. To do so, it may need to interact with a database containing the raw inventory data.
+
+### Decentralized organizations: peer-to-peer systems
+In many business environments, distributed processing is equivalent to organizing a client-server application
+as a multitiered architecture. We refer to this type of distribution as **vertical distribution**. The characteristic feature of vertical distribution is that it is
+achieved by placing logically different components on different machines.</br>
+In modern architectures, it is often the distribution of the clients and the servers that counts, which we refer to as **horizontal distribution**. In this type of distribution, a client or server may be physically split up into
+logically equivalent parts, but each part is operating on its own share of the complete data set, thus balancing the load. In this section we will take a look at a class of modern system architectures that support horizontal distribution,
+known as **peer-to-peer systems**.</br>
+From a high-level perspective, the processes that constitute a peer-to-peer system are all equal. This means that the functions that need to be carried out are represented by every process that constitutes the distributed system.
+As a consequence, much of the interaction between processes is symmetric: each process will act as a client and a server at the same time (which is also referred to as acting as a **servant**).</br>
+Given this symmetric behavior, peer-to-peer architectures evolve around the question how to organize the processes in an **overlay network** a network in which the nodes are formed by the processes and the links
+represent the possible communication channels.A node may not be able to communicate directly with an arbitrary other node, but is required to send messages through the available communication channels. Two types of overlay networks exist: those that are structured and those that are not.</br>
+
+#### Structured peer-to-peer systems
+As its name suggests, in a structured peer-to-peer system the nodes (i.e., processes) are organized in an overlay that adheres to a specific, deterministic
+topology: a ring, a binary tree, a grid, etc. This topology is used to efficiently look up data. Characteristic for structured peer-to-peer systems, is that they
+are generally based on using a so-called semantic-free index. What this means is that each data item that is to be maintained by the system, is uniquely
+associated with a key, and that this key is subsequently used as an index. To this end, it is common to use a hash function, so that we get:</br>
+_key(data item) = hash(data item’s value).</br>_
+The peer-to-peer system as a whole is now responsible for storing (key,value) pairs. To this end, each node is assigned an identifier from the same set
+of all possible hash values, and each node is made responsible for storing data associated with a specific subset of keys. In essence, the system is
+thus seen to implement a **distributed hash table**, generally abbreviated to a **DHT**</br>
+Following this approach now reduces the essence of structured peer-to-peer systems to being able to look up a data item by means of its key. That
+is, the system provides an efficient implementation of a function **lookup** that maps a key to an **existing** node:</br>
+_existing node:existing node = lookup(key)</br>_
+This is where the topology of a structured peer-to-peer system plays a crucial role. Any node can be asked to look up a given key, which then boils down to
+efficiently routing that lookup request to the node responsible for storing the data associated with the given key.
+
+#### Unstructured peer-to-peer systems
+Structured peer-to-peer systems attempt to maintain a specific, deterministic overlay network. In contrast, in an unstructured peer-to-peer system each
+node maintains an ad hoc list of neighbors. The resulting overlay resembles what is known as a **random graph**.</br>
+In an unstructured peer-to-peer system, when a node joins it often contacts a well-known node to obtain a starting list of other peers in the system. This
+list can then be used to find more peers, and perhaps ignore others, and so on. In practice, a node generally changes its local list almost continuously.</br>
+Unlike structured peer-to-peer systems, looking up data cannot follow a predetermined route when lists of neighbors are constructed in an ad hoc
+fashion. Instead, in an unstructured peer-to-peer systems we really need to resort to _searching_ for data. Let us look at two
+extremes and consider the case in which we are requested to search for specific data.
+* Flooding: an issuing node u simply passes a request for a data item to all its neighbors.
+* Random walks: an issuing node u can simply try to find a data item by asking a randomly chosen neighbor
+
+#### Hierarchically organized peer-to-peer networks
+Notably in unstructured peer-to-peer systems, locating relevant data items can become problematic as the network grows. The reason for this scalability
+problem is simple: as there is no deterministic way of routing a lookup request to a specific data item, essentially the only technique a node can resort to is
+searching for the request by means of flooding or randomly walking through the network. As an alternative many peer-to-peer systems have proposed to make use of special nodes that maintain an index of data items. </br>
+There are other situations in which abandoning the symmetric nature of peer-to-peer systems is sensible. Consider a collaboration of nodes that
+offer resources to each other. For example, in a collaborative content delivery network (CDN), nodes may offer storage for hosting copies ofWeb documents
+allowing Web clients to access pages nearby, and thus to access them quickly. What is needed is a means to find out where documents can be stored best.
+In that case, making use of a **broker** that collects data on resource usage and availability for a number of nodes that are in each other’s proximity will allow
+to quickly select a node with sufficient resources.</br>
+Nodes such as those maintaining an index or acting as a broker are generally referred to as **super peers**. As the name suggests, super peers are often
+also organized in a peer-to-peer network, leading to a hierarchical organization.(fig 2.20) In this organization, every regular
+peer, now referred to as a **weak peer**, is connected as a client to a super peer.
+All communication from and to a weak peer proceeds through that peer’s associated super peer.</br>
+In many cases, the association between a weak peer and its super peer is fixed: whenever a weak peer joins the network, it attaches to one of the
+super peers and remains attached until it leaves the network. Obviously, it is expected that super peers are long-lived processes with high availability.
+![Super-peer network](../misc/distributed_systems/c2/fig2_20.png)
+As we have seen, peer-to-peer networks offer a flexible means for nodes to join and leave the network. However, with super-peer networks a new
+problem is introduced, namely how to select the nodes that are eligible to become super peer.</br>
+Initial Skype arch.
+
+### Hybrid Architectures
 
 
 
