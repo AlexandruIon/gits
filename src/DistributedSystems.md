@@ -6,6 +6,9 @@
   * [1.2 Design goals](#1.2-Design-goals)
   * [1.3 Types of distributed systems](#1.3-Types-of-distributed-systems)
 * [Architectures](#architectures)
+  * [2.1 Architectural styles](#2.1-Architectural-styles)
+  * [2.2 Middleware organization](#2.2-Middleware-organization)
+  * [2.3 System architecture](#2.3-System-architecture)
 * [Setup](#setup)
 
 # Introduction
@@ -163,6 +166,7 @@ than just providing lots of resources.
 High-performance computing more or less started with the introduction of **multiprocessor machines**. In this case, multiple CPUs are organized in such a way
 that they all have access to the same physical memory.</br>
 In contrast, in a **multicomputer system** several computers are connected through a network and there is no sharing of main memory.
+
 ![Multiprocessor vs Multicomputer architectures](../misc/distributed_systems/c1/fig1_6.png)
 
 This shift also meant that many programs had to make use of message passing instead of modifying shared data as a means of communication and synchronization between threads
@@ -171,7 +175,9 @@ Unfortunately, message-passing models have proven to be much more difficult and 
 #### Cluster computing
 It became financially and technically attractive to build a supercomputer using off-the-shelf technology by simply hooking up a collection of relatively simple computers in a high-speed network.
 In virtually all cases, cluster computing is used for **parallel programming in which a single** (compute intensive) **program is run in parallel on multiple machines**.
+
 ![Cluster computing](../misc/distributed_systems/c1/fig1_7.png)
+
 Each cluster consists of a collection of compute nodes that are controlled and accessed by means of a single master node. The master typically
 handles the allocation of nodes to a particular parallel program, maintains a batch queue of submitted jobs, and provides an interface for the users of
 the system. As such, the master actually runs the middleware needed for the execution of programs and management of the cluster, while the compute
@@ -185,7 +191,9 @@ A key issue in a grid-computing system is that resources from different organiza
 people from different institutions, indeed forming a federation of systems. Such a collaboration is realized in the form of a **virtual organization**.</br>
 Given its nature, much of the software for realizing grid computing evolves around providing access to resources from different administrative domains,
 and to only those users and applications that belong to a specific virtual organization. For this reason, focus is often on architectural issues.
+
 ![Grid computing](../misc/distributed_systems/c1/fig1_8.png)
+
 * fabric layer - interfaces to local resources at a specific site. (query the state and capabilities of a resource + resource management (locking resources))
 * connectivity layer - communication protocols for supporting grid transactions that span the usage of multiple resources(protocols to transfer data/ access resources)
 * resource layer - is responsible for managing a single resource - it uses the connectivity layer and calls directly the fabric layer interfaces 
@@ -199,7 +207,9 @@ These layers jointly provide access to and management of resources that are pote
 computing formed the basis for what is now called **cloud computing**.</br>
 Cloud computing is characterized by an easily usable and accessible pool of virtualized resources.The link to utility computing is formed by the fact that cloud
 computing is generally based on a pay-per-use model in which guarantees are offered by means of customized service level agreements (SLAs).
+
 ![cloud computing](../misc/distributed_systems/c1/fig1_9.png)
+
 Clouds are organized in 4 layers:
 * Hardware - at data center level
 * Infrastructure - it deploys virtualization techniques (virtual storage and computing resources)
@@ -226,18 +236,24 @@ using transactions requires special primitives that must either be supplied by t
 system. In a mail system, there might be primitives to send, receive, and forward mail.</br>
 Ordinary statements, procedure calls, and so on, are also allowed inside a transaction. In particular, **remote procedure calls**
 (**RPC**s), that is, procedure calls to remote servers, are often also encapsulated in a transaction, leading to what is known as a **transactional RPC**.
+
 ![Primitives for transaction](../misc/distributed_systems/c1/fig1_10.png)
+
 In distributed systems, transactions are often constructed as a number of subtransactions, jointly forming a **nested transaction**.
 The top-level transaction may fork off children that run in parallel with one another, on different machines, to gain performance or simplify programming.
 Each of these children may also execute one or more subtransactions, or fork off its own children.
+
 ![Nested transaction](../misc/distributed_systems/c1/fig1_11.png)
+
 Nested transactions are important in distributed systems, for they provide a natural way of distributing a transaction across multiple machines. They
 follow a logical division of the work of the original transaction.</br>
 In the early days of enterprise middleware systems, the component that handled distributed (or nested) transactions formed the core for integrating
 applications at the server or database level. This component was called a **transaction processing monitor** or **TP monitor** for short. Its main task was
 to allow an application to access multiple server/databases by offering it a transactional programming model, as shown in Figure 1.12. Essentially, the TP
 monitor coordinated the commitment of subtransactions following a standard protocol known as **distributed commit**.
+
 ![TP monitor](../misc/distributed_systems/c1/fig1_12.png)
+
 An important observation is that applications wanting to coordinate several subtransactions into a single transaction did not have to implement this
 coordination themselves. This is exactly where middleware comes into play: it implements services that are useful for many applications avoiding that
 such services have to be reimplemented over and over again by application developers
@@ -247,7 +263,9 @@ The more applications became decoupled from the databases they were built upon, 
 to integrate applications independently from their databases. In particular, application components should be able to communicate directly with each other
 and not merely by means of the request/reply behavior that was supported by transaction processing systems.</br>
 The main idea was that existing applications could directly exchange information.
+
 ![Middleware as communication](../misc/distributed_systems/c1/fig1_12.png)
+
 Several types of communication middleware exist. With remote procedure calls (RPC), an application component can effectively send a request to another
 application component by doing a local procedure call, which results in the request being packaged as a message and sent to the callee. Likewise, the
 result will be sent back and returned to the application as the result of the procedure call.
@@ -320,7 +338,9 @@ Using components and connectors, we can come to various configurations, which, i
 ### Layered architectures
 The basic idea for the layered style is simple: components are organized in a layered fashion where a component at layer Lj can make a **downcall** to
 a component at a lower-level layer Li (with i < j) and generally expects a response. Only in exceptional cases will an **upcall** be made to a higher-level component.
+
 ![Layered Architecture](../misc/distributed_systems/c2/fig2_1.png)
+
 Figure 2.1(a) shows a standard organization in which only downcalls to the next lower layer are made. This organization is commonly deployed in the case of **network communication**.</br>
 Finally, a special situation is shown in Figure 2.1(c). In some cases, it is convenient to have a lower layer do an upcall to its next higher layer. A typical example is when an operating system signals the occurrence of an
 event, to which end it calls a user-defined operation for which an application had previously passed a reference (typically referred to as a handle).
@@ -329,6 +349,7 @@ event, to which end it calls a user-defined operation for which an application h
 A well-known and ubiquitously applied layered architecture is that of so called **communication-protocol stacks**.</br>
 In communication-protocol stacks, each layer implements one or several **communication services** allowing data to be sent from a destination to one
 or several targets. To this end, each layer offers an interface specifying the functions that can be called.
+
 ![Layered Communication protocol stack](../misc/distributed_systems/c2/fig2_2.png)
 
 #### Application layering
@@ -340,13 +361,17 @@ Logical layering of applications:
 ### Object-based and service-oriented architectures
 In essence, each object corresponds to what we have defined as a component, and these components are connected through a procedure call mechanism.
 In the case of distributed systems, a procedure call can also take place over a network, that is, the calling object need not be executed on the same machine as the called object.</br>
+
 ![Object Based arch style](../misc/distributed_systems/c2/fig2_5.png)
+
 Object-based architectures are attractive because they provide a natural way of encapsulating data (called an object’s state) and the operations that can
 be performed on that data (which are referred to as an object’s methods) into a single entity. The **interface** offered by an object conceals implementation
 details, essentially meaning that we, in principle, can consider an object completely independent of its environment.</br>
 This separation between interfaces and the objects implementing these interfaces allows us to place an interface at one machine, while the object itself
 resides on another machine. This organization, which is shown in Figure 2.6 is commonly referred to as a **distributed object**.
+
 ![Remote Object](../misc/distributed_systems/c2/fig2_6.png)
+
 When a client **binds** to a distributed object, an implementation of the object’s interface, called a **proxy**, is then loaded into the client’s address space.
 A proxy is analogous to a client stub in RPC systems. The only thing it does is marshal method invocations into messages and unmarshal reply messages
 to return the result of the method invocation to the client. The actual object resides at a server machine, where it offers the same interface as it does on the client machine.</br>
@@ -366,7 +391,9 @@ This approach has now been widely adopted for the Web and is known as **Represen
 * All services offer the same interface, consisting of at most four operation
 * Messages sent to or from a service are fully self-described
 * After executing and operation at a service, that component forgets everything about the caller (**stateless execution**)
+* 
 ![Rest operations](../misc/distributed_systems/c2/fig2_7.png)
+
 The RESTful architecture has become popular because of its simplicity. whether RESTful services are better than where services are specified by means of **service-specific interfaces**. 
 The simplicity of RESTful architectures can easily prohibit easy solutions to intricate communication schemes. One example is where distributed transactions are needed, which generally requires that services keep track of
 the state of execution. On the other hand, there are many examples in which RESTful architectures perfectly match a simple integration scheme of services,yet where the myriad of service interfaces will complicate matters.
@@ -376,13 +403,19 @@ Architecture in which dependencies between processes become as loose as possible
 Architecture in which there is a strong separation between **processing** and **coordination**.
 The idea is to view a system as a collection of autonomously operating processes. In this model, **coordination** encompasses
 the **communication** and **cooperation** between processes.
+
 ![Coordination](../misc/distributed_systems/c2/fig2_9.png)
+
 Shared data spaces are often combined with event-based coordination: a process subscribes to certain tuples by providing a search pattern; when a
 process inserts a tuple into the data space, matching subscribers are notified. In both cases, we are dealing with a publish-subscribe architecture.
+
 ![EventBased/SharedDataspace architectural style](../misc/distributed_systems/c2/fig2_10.png)
+
 We have also shown an abstraction of the mechanism by which publishers and subscribers are matched, known as an **event bus**.</br>
 An important aspect of publish-subscribe systems is that communication takes place by describing the events that a subscriber is interested in. As a consequence, naming plays a crucial role.
+
 ![Publisher/Subscriber](../misc/distributed_systems/c2/fig2_12.png)
+
 Clearly, in publish-subscribe systems such as these, the crucial issue is the efficient and scalable implementation of matching subscriptions to notifications.
 
 
@@ -399,14 +432,15 @@ Again, facilitating a reduction of the number of wrappers is typically done thro
 **broker**, which is logically a centralized component that handles all the accesses between different applications. An often-used type is a **message broker**
 In the case of a message broker, applications simply send requests to the broker containing information on what they need. The broker, having knowledge of all relevant
 applications, contacts the appropriate applications, possibly combines and transforms the responses and returns the result to the initial application.
+
 ![Wrapper vs Broker](../misc/distributed_systems/c2/fig2_13.png)
 
 ### Interceptors
 Conceptually, an **interceptor** is nothing but a software construct that will break the usual flow of control and allow other (application specific) code to be executed.
 Interceptors are a primary means for adapting middleware to the specific needs of an application.</br>
 To make matters concrete, consider interception as supported in many object-based distributed systems.
-![Interceptor to handle remote invocations](../misc/distributed_systems/c2/fig2_14.png)
 
+![Interceptor to handle remote invocations](../misc/distributed_systems/c2/fig2_14.png)
 
 ### Modifiable middleware
 What wrappers and interceptors offer are means to extend and adapt the middleware. The need for adaptation comes from the fact that the environment
@@ -424,7 +458,9 @@ Thinking in terms of **clients** that request services from servers helps unders
 
 #### Simple client-server architecture
 This client-server interaction, also known as request-reply behavior is shown in Figure 2.15 in the form of a message sequence chart.
+
 ![Request Replay](../misc/distributed_systems/c2/fig2_15.png)
+
 Communication between a client and a server can be implemented by means of a simple connectionless protocol when the underlying network is
 fairly reliable as in many local-area networks.</br>
 Using a **connectionless** protocol has the obvious advantage of being efficient.As long as messages do not get lost or corrupted, the request/reply protocol just sketched works fine.</br>
@@ -436,13 +472,17 @@ the connection is torn down. The trouble may be that setting up and tearing down
 #### Multitiered architectures
 The distinction into three logical levels as discussed so far, suggests a number of possibilities for physically distributing a client-server application across several machines.
 We make a distinction between only two kinds of machines: **client machines** and **server machines**, leading to what is also referred to as a **(physically) two-tiered architecture**.
+
 ![Tow Tiered architecture](../misc/distributed_systems/c2/fig2_16.png)
+
 When distinguishing only client and server machines as we did so far, we miss the point that a server may sometimes need to act as a client, as shown
 in Figure 2.17, leading to a **(physically) three-tiered architecture**.</br>
 These organizations are used where the client machine is a PC or workstation, connected through a network to a distributed file system or database. Essentially, most of the
 application is running on the client machine, but all operations on files or database entries go to the server. For example, many banking applications
-run on an end-user’s machine where the user prepares transactions and such.</br>
+run on an end-user’s machine where the user prepares transactions and such.
+
 ![Sever acting as a client](../misc/distributed_systems/c2/fig2_17.png)
+
 In this architecture, traditionally programs that form part of the processing layer are executed by a separate server, but may additionally be partly
 distributed across the client and server machines. A typical example of where a three-tiered architecture is used is in transaction processing. A separate
 process, called the **transaction processing monitor**, coordinates all transactions across possibly different data servers.</br>
@@ -504,21 +544,39 @@ peer, now referred to as a **weak peer**, is connected as a client to a super pe
 All communication from and to a weak peer proceeds through that peer’s associated super peer.</br>
 In many cases, the association between a weak peer and its super peer is fixed: whenever a weak peer joins the network, it attaches to one of the
 super peers and remains attached until it leaves the network. Obviously, it is expected that super peers are long-lived processes with high availability.
+
 ![Super-peer network](../misc/distributed_systems/c2/fig2_20.png)
+
 As we have seen, peer-to-peer networks offer a flexible means for nodes to join and leave the network. However, with super-peer networks a new
 problem is introduced, namely how to select the nodes that are eligible to become super peer.</br>
 Initial Skype arch.
 
 ### Hybrid Architectures
+Distributed systems in which client-server solutions are combined with decentralized architectures.
 
+#### Edge-server systems
+These systems are deployed on the Internet where servers are placed “at the edge” of the network.
+This edge is formed by the boundary between enterprise networks and the actual Internet, for example, as provided by an **Internet Service Provider (ISP)**.
+Likewise, where end users at home connect to the Internet through their ISP, the ISP can be considered as residing at the edge of the Internet.
 
+![Edge services](../misc/distributed_systems/c2/fig2_21.png)
 
+This concept of edge-server systems is now often taken a step further: taking cloud computing as implemented in a data center as the core, additional
+servers at the edge of the network are used to assist in computations and storage, essentially leading to distributed cloud systems.
 
+#### Collaborative distributed systems
+Hybrid structures are notably deployed in collaborative distributed systems. The main issue in many of these systems is to first get started, for which often
+a traditional client-server scheme is deployed. Once a node has joined the system, it can use a fully decentralized scheme for collaboration.
 
+To make matters concrete, let us consider the widely popular **BitTorrent file-sharing system**.BitTorrent is a peer-to-peer file downloading system
+The basic idea is that when an end user is looking for a file, he downloads chunks of the file from other users until the downloaded chunks can be assembled together yielding the complete file. An important design goal was to ensure collaboration.
+In most file-sharing systems, a significant fraction of participants merely download files but otherwise contribute close to nothing a phenomenon referred to as **free
+riding**. To prevent this situation, in BitTorrent a file can be downloaded only when the downloading client is providing content to someone else.
 
+![BitTorrent](../misc/distributed_systems/c2/fig2_22.png)
 
-
-
-
+To download a file, a user needs to access a global directory, which is generally just one of a few well-known Web sites. Such a directory contains
+references to what are called torrent files. A **torrent file** contains the information that is needed to download a specific file. In particular, it contains a link
+to what is known as a **tracker**, which is a server that is keeping an accurate account of active nodes that have (chunks of) the requested file.
 
 
