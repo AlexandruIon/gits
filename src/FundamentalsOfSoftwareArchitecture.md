@@ -6,6 +6,19 @@
     * [2.1 Architectural styles](#2.1-Architectural-styles)
     * [2.2 Middleware organization](#2.2-Middleware-organization)
     * [2.3 System architecture](#2.3-System-architecture)
+* [Chapter 3. Modularity](#Chapter-3.-Modularity)
+* [Chapter 4. Architecture Characteristics Defined](#Chapter-4.-Architecture-Characteristics-Defined)
+* [Chapter 5. Identifying Architectural Characteristics](#Chapter-5.-Identifying-Architectural-Characteristics)
+* [Chapter 8. Component-Based Thinking](#Chapter-8.-Component-Based-Thinking)
+* [Chapter 9. Foundations](#Chapter-9.-Foundations)
+* [Chapter 10. Layered Architecture Style](#Chapter-10.-Layered-Architecture-Style)
+* [Chapter 11. Pipeline Architecture Style](#Chapter-11.-Pipeline-Architecture-Style)
+* [Chapter 12. Microkernel Architecture Style](#Chapter-12.-Microkernel-Architecture-Style)
+* [Chapter 13. Service-Based Architecture Style](#Chapter-13.-Service-Based-Architecture-Style)
+* [Chapter 14. Event-Driven Architecture Style](#Chapter-14.-Event-Driven-Architecture-Style)
+* [Chapter 15. Space-Based Architecture Style](#Chapter-15.-Space-Based-Architecture-Style)
+* [Chapter 16. Orchestration-Driven Service-Oriented Architecture](#Chapter-16.-Orchestration-Driven-Service-Oriented-Architecture)
+* [Chapter 17. Microservices Architecture](#Chapter-17.-Microservices-Architecture)
 * [Setup](#setup)
 
 # Chapter 1. Introduction
@@ -221,7 +234,6 @@ refers to source-code-level coupling
 #### Dynamic connascence
 which analyzes calls at runtime
 
-
 # Chapter 4. Architecture Characteristics Defined
 
 ![Domain requirements and architectural characteristics](../misc/fundamentals_of_software_architecture/c4/fig4_1.png)
@@ -271,7 +283,6 @@ Architects must concern themselves with code structure.
 * Authorization
 * Privacy
 * Security
-
 
 # Chapter 5. Identifying Architectural Characteristics
 An architect uncovers architecture characteristics in at least three ways by extracting from **domain concerns**, **requirements**, and **implicit domain knowledge**(covered in 4).
@@ -325,7 +336,6 @@ One of the fundamental distinctions between different architecture patterns is w
 Architects using technical partitioning organize the components of the system by technical capabilities: presentation, business rules, persistence, and so on. Thus, one of the organizing principles of this architecture is separation of technical concerns. This in turn creates useful levels of decoupling: if the service layer is only connected to the persistence layer below and business rules layer above, then changes in persistence will only potentially affect those layers. This style of partitioning provides a decoupling technique, reducing rippling side effects on dependent components.
 
 Neither of these styles is more correct than the other—refer to the First Law of Software Architecture. That said, we have observed a decided industry trend over the last few years toward domain partitioning for the monolithic and distributed (for example, microservices) architectures. However, it is one of the first decisions an architect must make.
-
 
 # Chapter 9. Foundations
 Architecture styles, sometimes called architecture patterns, describe a named relationship of components covering a variety of architecture characteristics.
@@ -421,7 +431,6 @@ The pipeline architecture style is a technically partitioned architecture due to
 Overall cost and simplicity combined with modularity are the primary strengths of the pipeline architecture style.
 Deployability and testability, while only around average, rate slightly higher than the layered architecture due to the level of modularity achieved through filters.
 
-
 # Chapter 12. Microkernel Architecture Style
 The microkernel architecture style (also referred to as the plug-in architecture). is a natural fit for **product-based applications**.
 
@@ -495,6 +504,7 @@ Lastly, service-based architecture is a good choice for achieving a good level o
 As services become more fine-grained, both orchestration and choreography are necessary to tie the services together to complete the business transaction.
 
 because services within a service-based architecture tend to be more coarse-grained, they don’t require coordination nearly as much as other distributed architectures.
+
 # Chapter 14. Event-Driven Architecture Style
 The event-driven architecture style is a popular distributed asynchronous architecture style used to produce highly scalable and high-performance applications.
 
@@ -757,3 +767,139 @@ First, it generally uses a single database or just a few databases, creating cou
 Modern engineering goals such as deployability and testability score disastrously in this architecture, both because they were poorly supported and because those were not important (or even aspirational) goals during that era.
 
 # Chapter 17. Microservices Architecture
+Microservices is heavily inspired by the ideas in **domain-driven design (DDD)**, a logical design process for software projects.
+
+ne concept in particular from DDD, **bounded context**, decidedly inspired microservices. The concept of bounded context represents a decoupling style.
+
+While reuse is beneficial, remember the First Law of Software Architecture regarding trade-offs. The negative trade-off of reuse is **coupling**. When an architect designs a system that favors reuse, they also favor coupling to achieve that reuse, either by inheritance or composition.
+
+However, if the architect’s goal requires high degrees of decoupling, then they favor duplication over reuse. The primary goal of microservices is high decoupling, physically modeling the logical notion of bounded context.
+
+## Topology
+Architects expect each service to include all necessary parts to operate independently, including databases and other dependent components.
+![Topology](../misc/fundamentals_of_software_architecture/c17/fig17_1.png)
+
+## Distributed
+Each service runs in its own process.
+
+Separating each service into its own process solves all the problems brought on by sharing.
+
+Performance is often the negative side effect of the distributed nature of microservices. Network calls take much longer than method calls, and security verification at every endpoint adds additional processing time, requiring architects to think carefully about the implications of granularity when designing the system.
+
+Because microservices is a distributed architecture, experienced architects advise against the use of transactions across service boundaries, making determining the granularity of services the key to success in this architecture.
+
+## Bounded Context
+each service models a domain or workflow
+
+Microservices take the concept of a **domain-partitioned architecture** to the extreme. Each service is meant to represent a domain or subdomain.
+
+### Granularity
+Architects struggle to find the correct granularity for services in microservices, and often make the mistake of making their services too small, which requires them to build **communication links** back between the services to do useful work.
+
+Some guidelines architects can use to help find the appropriate boundaries:
+* Purpose : microservice should be extremely functionally cohesive
+* Transactions
+* Choreography : If an architect builds a set of services that offer excellent domain isolation yet require extensive communication to function, the architect may consider bundling these services back into a larger service to avoid the communication overhead.
+
+### Data isolation
+Architects must be wary of the entity trap (discussed in “Entity trap”) and not simply model their services to resemble single entities in a database.
+
+### API Layer
+It is common because it offers a good location within the architecture to perform useful tasks, either via indirection as a proxy or a tie into operational facilities, such as a naming service.
+
+While an API layer may be used for variety of things, it should not be used as a mediator or orchestration tool if the architect wants to stay true to the underlying philosophy of this architecture: all interesting logic in this architecture should occur inside a bounded context, and putting orchestration or other logic in a mediator violates that rule.
+
+This also illustrates the difference between technical and domain partitioning in architecture: architects typically use mediators in technically partitioned architectures, whereas microservices is firmly domain partitioned.
+
+### Operational Reuse
+Microservices prefers duplication to coupling.
+
+One of the philosophies in the traditional service-oriented architecture was to **reuse as much functionality** as possible, **domain** and **operational** alike. In microservices, architects try to split these two concerns.
+
+**The sidecar pattern.**
+![Side car](../misc/fundamentals_of_software_architecture/c17/fig17_2.png)
+
+The common operational concerns appear within each service as a separate component.
+
+The sidecar component handles all the operational concerns that teams benefit from coupling together.
+
+Once teams know that each service includes a common sidecar, they can build a service mesh, allowing unified control across the architecture for concerns like logging and monitoring.
+
+![Service plane](../misc/fundamentals_of_software_architecture/c17/fig17_3.png)
+
+Architects use service discovery as a way to build elasticity into microservices architectures.
+
+## Frontends
+In Figure 17-5, the monolithic frontend features a single user interface that calls through the API layer to satisfy user requests.
+
+![Monolithic user interface](../misc/fundamentals_of_software_architecture/c17/fig17_5.png)
+
+The second option for user interfaces uses microfrontends, shown in Figure 17-6.
+
+![Microfrontend pattern](../misc/fundamentals_of_software_architecture/c17/fig17_6.png)
+
+In Figure 17-6, this approach utilizes components at the user interface level to create a synchronous level of granularity and isolation in the user interface as the backend services.
+
+## Communication
+Architects and developers struggle with appropriate granularity, which affects both data isolation and communication.
+
+Architects must decide on synchronous or asynchronous communication.
+
+Microservices architectures typically utilize protocol-aware heterogeneous interoperability.
+
+* protocol-aware : That means that services must know (or discover) which protocol to use to call other services.
+* heterogeneous : microservices fully supports polyglot environments, where different services use different platforms.
+* interoperability : Describes services calling one another
+
+For asynchronous communication, architects often use events and messages, thus internally utilizing an event-driven architecture; the broker and mediator patterns manifest in microservices as choreography and orchestration.
+
+## Choreography and Orchestration
+Choreography utilizes the same communication style as a broker event-driven architecture.
+
+Domain/architecture isomorphism is one key characteristic that architects should look for when assessing how appropriate an architecture style is for a particular problem.
+
+In **choreography**, each service calls other services as needed, without a central mediator.
+
+![Choreography](../misc/fundamentals_of_software_architecture/c17/fig17_7.png)
+
+Because microservices architectures don’t include a global mediator like other service-oriented architectures, if an architect needs to coordinate across several services, they can create their own localized mediator, as shown in Figure 17-8.
+
+![Orchestration](../misc/fundamentals_of_software_architecture/c17/fig17_8.png)
+
+In choreography, the architect preserves the highly decoupled philosophy of the architecture style, thus reaping maximum benefits touted by the style. However, common problems like error handling and coordination become more complex in choreographed environments.
+
+Consider an example with a more complex workflow, shown in Figure 17-9.
+
+![Choreography for complex workflows](../misc/fundamentals_of_software_architecture/c17/fig17_9.png)
+
+In Figure 17-9, the first service called must coordinate across a wide variety of other services, basically acting as a mediator in addition to its other domain responsibilities. This pattern is called the **front controller pattern**, where a nominally choreographed service becomes a more complex mediator for some problem. The downside to this pattern is added complexity in the service.
+
+Alternatively, an architect may choose to use orchestration for complex business processes, illustrated in Figure 17-10.
+
+![Orchestration for complex workflows](../misc/fundamentals_of_software_architecture/c17/fig17_10.png)
+
+In Figure 17-10, the architect builds a mediator to handle the complexity and coordination required for the business workflow. While this creates coupling between these services, it allows the architect to focus coordination into a single service, leaving the others less affected
+
+## Transactions and Sagas
+
+The best advice for architects who want to do transactions across services is: **don’t**! Fix the granularity components instead.
+
+Exceptions always exist. For example, a situation may arise where two different services need vastly different architecture characteristics, requiring distinct service boundaries, yet still need transactional coordination. In those situations, patterns exist to handle transaction orchestration, with serious trade-offs.
+
+A popular distributed transactional pattern in microservices is the **saga pattern**, illustrated in Figure 17-11.
+
+![Saga pattern](../misc/fundamentals_of_software_architecture/c17/fig17_11.png)
+
+In Figure 17-11, a service acts a mediator across multiple service calls and coordinates the transaction.
+
+## Architecture Characteristics Ratings
+
+As microservices is a distributed architecture, it suffers from many of the deficiencies inherent in architectures made from pieces wired together at runtime.
+
+![Ratings](../misc/fundamentals_of_software_architecture/c17/fig17_13.png)
+
+The high points of this architecture are scalability, elasticity, and evolutionary.
+
+Performance is often an issue in microservices—distributed architectures must make many network calls to complete work, which has high performance overhead, and they must invoke security checks to verify identity and access for each endpoint.
+
+Performance is another reason that microservices often use choreography rather than orchestration, as less coupling allows for faster communication and fewer bottlenecks.
