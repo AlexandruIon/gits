@@ -342,7 +342,7 @@ Architecture styles can be classified into two main types:
   * Service-based architecture
   * Event-driven architecture
   * Space-based architecture
-  * Service-oriented architecture
+  * Orchestration-Driven Service-Oriented Architecture
   * Microservices architecture
 
 # Chapter 10. Layered Architecture Style
@@ -472,17 +472,29 @@ Because domain services in a service-based architecture are generally coarse-gra
 
 ![Domain service variants](../misc/fundamentals_of_software_architecture/c13/fig13_5.png)
 
+Regardless of the service design, a domain service must contain some sort of API access facade that the user interface interacts with to execute some sort of business functionality. The API access facade typically takes on the responsibility of orchestrating the business request from the user interface.
+
 Because domain services are coarse-grained, regular ACID (atomicity, consistency, isolation, durability) database transactions involving database commits and rollbacks are used to ensure database integrity within a single domain service. Highly distributed architectures like microservices, on the other hand, usually have fine-grained services and use a distributed transaction technique known as BASE transactions (basic availability, soft state, eventual consistency) that rely on eventual consistency and hence do not support the same level of database integrity as ACID transactions in a service-based architecture.
+
+Domain services, being coarse-grained, allow for better data integrity and consistency, but there is a trade-off.
 
 ## Architecture Characteristics Ratings
 
 ![Ratings](../misc/fundamentals_of_software_architecture/c13/fig13_6.png)
 
+Service-based architecture is a domain-partitioned architecture.
+
 Service-based architecture is also a natural fit when doing domain-driven design.
+
+Fault tolerance and overall application availability also rate high for service-based architecture. Even though domain services tend to be coarse-grained, the four-star rating comes from the fact that with this architecture style, services are usually self-contained and do not leverage interservice communication due to database sharing and code sharing.
+
+Service-based architectures tend to be more reliable than other distributed architectures due to the coarse-grained nature of the domain services.
+
 Service-based architecture preserves **ACID transactions** better than any other distributed architecture due to the coarse-grained nature of the domain services
 Lastly, service-based architecture is a good choice for achieving a good level of architectural modularity without having to get tangled up in the complexities and pitfalls of granularity. As services become more fine-grained, issues surrounding orchestration and choreography start to appear.
 As services become more fine-grained, both orchestration and choreography are necessary to tie the services together to complete the business transaction.
 
+because services within a service-based architecture tend to be more coarse-grained, they don’t require coordination nearly as much as other distributed architectures.
 # Chapter 14. Event-Driven Architecture Style
 The event-driven architecture style is a popular distributed asynchronous architecture style used to produce highly scalable and high-performance applications.
 
@@ -568,9 +580,15 @@ We recommend choosing the request-based model for well-structured, data-driven r
 Some common architecture styles that leverage event-driven architecture as part of another architecture style include microservices and space-based architecture.
 
 ## Architecture Characteristics Ratings
-Event-driven architecture is primarily a technically partitioned architecture in that any particular domain is spread across multiple event processors and tied together through mediators, queues, and topics.
+Event-driven architecture is primarily a **technically partitioned** architecture in that any particular domain is spread across multiple event processors and tied together through mediators, queues, and topics.
 
 ![Characteristics ratings](../misc/fundamentals_of_software_architecture/c14/fig14_5.png)
+
+Event-driven architecture gains five stars for performance, scalability, and fault tolerance, the primary strengths of this architecture style.
+
+Overall **simplicity** and **testability** rate relatively low with event-driven architecture, mostly due to the nondeterministic and dynamic event flows typically found within this architecture style.
+
+Finally, event-driven architectures are highly evolutionary, hence the five-star rating.
 
 # Chapter 15. Space-Based Architecture Style
 In web apps. In any high-volume application with a large concurrent user load, the database will usually be the final limiting factor in how many transactions you can process concurrently.
@@ -582,7 +600,7 @@ It is also a useful architecture style for applications that have variable and u
 
 ## General Topology
 
-Gets its name from the concept of tuple space, the technique of using multiple parallel processors communicating through shared memory. High scalability, high elasticity, and high performance are achieved by removing the central database as a synchronous constraint in the system and instead leveraging replicated in-memory data grids. Application data is kept in-memory and replicated among all the active processing units.
+Gets its name from the concept of tuple space, the technique of using multiple parallel processors communicating through shared memory. High scalability, high elasticity, and high performance are achieved by removing the central database as a synchronous constraint in the system and instead **leveraging replicated in-memory data grids**. Application data is kept in-memory and replicated among all the active processing units.
 When a processing unit updates data, it asynchronously sends that data to the database, usually via messaging with persistent queues. Processing units start up and shut down dynamically as user load increases and decreases, thereby addressing variable scalability. Because there is no central database involved in the standard transactional processing of the application, the database bottleneck is removed, thus providing near-infinite scalability within the application.
 
 Architecture components:
@@ -642,4 +660,100 @@ The data writer component accepts messages from a data pump and updates the data
 A domain-based data writer contains all of the necessary database logic to handle all the updates within a particular domain (such as customer), regardless of the number of data pumps it is accepting.
 
 ### Data Readers
-data readers take on the responsibility for reading data from the database and sending it to the processing units via a reverse data pump.
+Data readers take on the responsibility for reading data from the database and sending it to the processing units via a reverse data pump.
+
+Only invoked under one of three situations:
+* a crash of all processing unit instances of the same named cache
+* a redeployment of all processing units within the same named cache
+* retrieving archive data not contained in the replicated cache.
+  
+![Reverse data pump](../misc/fundamentals_of_software_architecture/c15/fig15_7.png)
+
+The data writers and data readers essentially form what is usually known as a data **abstraction layer** (or data access layer in some cases).
+
+### Data Collisions
+due to replication latency.
+
+### Replicated Versus Distributed Caching
+Space-based architecture relies on caching for the transactional processing of an application. Removing the need for direct reads and writes to a database is how space-based architecture is able to support high scalability, high elasticity, and high performance. Space-based architecture mostly **relies on replicated caching**, although distributed caching can be used as well.
+
+![Replicated caching between processing units](../misc/fundamentals_of_software_architecture/c15/fig15_8.png)
+
+While replicated caching is the standard caching model for space-based architecture, there are some cases where it is not possible to use replicated caching. These situations include high data volumes (size of the cache) and high update rates to the cache data. 
+
+Distributed caching, as illustrated in Figure 15-13, requires an external server or service dedicated to holding a centralized cache. In this model the processing units do not store data in internal memory, but rather use a proprietary protocol to access the data from the central cache server. Distributed caching supports high levels of data consistency because the data is all in one place and does not need to be replicated. However, this model has less performance than replicated caching because the cache data must be accessed remotely, adding to the overall latency of the system.
+
+![Replicated caching between processing units](../misc/fundamentals_of_software_architecture/c15/fig15_9.png)
+
+The decision between using a replicated cache and a distributed cache becomes one of data consistency versus performance and fault tolerance. A distributed cache will always offer better data consistency over a replicated cache because the cache of data is in a single place (as opposed to being spread across multiple processing units). However, performance and fault tolerance will always be better when using a replicated cache.
+
+![Distributed versus replicated caching](../misc/fundamentals_of_software_architecture/c15/table15_1.PNG)
+
+### Near-Cache Considerations
+A **near-cache** is a type of caching hybrid model bridging in-memory data grids with a distributed cache. In this model (illustrated in Figure 15-14) the distributed cache is referred to as the **full backing cache**, and each in-memory data grid contained within each processing unit is referred to as the **front cache**.
+
+![Near-cache topology](../misc/fundamentals_of_software_architecture/c15/fig15_10.png)
+
+While the front caches are always kept in sync with the full backing cache, the front caches contained within each processing unit are not synchronized between other processing units sharing the same data. This means that multiple processing units sharing the same data context (such as a customer profile) will likely all have different data in their front cache. This creates inconsistencies in performance and responsiveness between processing units because each processing unit contains different data in the front cache. For this reason we do not recommended using a near-cache model for space-based architecture.
+
+### Architecture Characteristics Ratings
+Notice that space-based architecture maximizes elasticity, scalability, and performance (all five-star ratings). These are the driving attributes and main advantages of this architecture style. High levels of all three of these architecture characteristics are achieved by leveraging in-memory data caching and removing the database as a constraint.
+
+Trade-off for this advantage, specifically with regard to overall simplicity and testability.
+
+Space-based architecture is relatively expensive.
+
+![Ratings](../misc/fundamentals_of_software_architecture/c15/fig15_10.png)
+
+# Chapter 16. Orchestration-Driven Service-Oriented Architecture
+
+## Topology
+
+![orchestration-driven service-oriented architecture](../misc/fundamentals_of_software_architecture/c16/fig16_1.png)
+
+Service-oriented architecture is a distributed architecture; the exact demarcation of boundaries isn’t shown in Figure 16-1 because it varied based on organization.
+
+## Taxonomy
+The architect’s driving philosophy in this architecture centered around enterprise-level reuse.
+
+### Business Services
+provide the entry point.
+
+These service definitions contained no code—just input, output, and sometimes schema information. They were usually defined by business users, hence the name business services.
+
+### Enterprise Services
+The enterprise services contain fine-grained, shared implementations.
+These services are the building blocks that make up the coarse-grained business services, tied together via the orchestration engine.
+
+This separation of responsibility flows from the reuse goal in this architecture. If developers can build fine-grained enterprise services at just the correct level of granularity, the business won’t have to rewrite that part of the business workflow again. Gradually, the business will build up a collection of reusable assets in the form of reusable enterprise services.
+### Application Services
+Not all services in the architecture require the same level of granularity or reuse as the enterprise services. Application services are one-off, single-implementation services.
+### Infrastructure Services
+Infrastructure services supply the operational concerns, such as monitoring, logging, authentication, and authorization.
+### Orchestration Engine
+The orchestration engine forms the heart of this distributed architecture, stitching together the business service implementations using orchestration, including features like transactional coordination and message transformation. This architecture is typically tied to a single relational database, or a few, rather than a database per service as in microservices architectures. Thus, transactional behavior is handled declaratively in the orchestration engine rather than in the database.
+
+The orchestration engine defines the relationship between the business and enterprise services, how they map together, and where transaction boundaries lie. It also acts as an integration hub, allowing architects to integrate custom code with package and legacy software systems.
+### Message Flow
+All requests go through the orchestration engine—it is the location within this architecture where logic resides.
+Thus, message flow goes through the engine even for internal calls, as shown in Figure 16-2.
+
+![Message flow with service-oriented architecture](../misc/fundamentals_of_software_architecture/c16/fig16_2.png)
+
+## Reuse…and Coupling
+A major goal of this architecture is reuse at the service level—the ability to gradually build business behavior that can be incrementally reused over time.
+
+However, architects only slowly realized the negative trade-offs of this design.
+Thus, in service-oriented architecture, architects struggled with making incremental change—each change had a potential huge ripple effect. That in turn led to the need for coordinated deployments, holistic testing, and other drags on engineering efficiency.
+
+Perhaps the most damaging revelation from this architecture came with the realization of the impractically of building an architecture so focused on technical partitioning.
+## Architecture Characteristics Ratings
+Service-oriented architecture is perhaps the most technically partitioned general-purpose architecture ever attempted
+
+First, it generally uses a single database or just a few databases, creating coupling points within the architecture across many different concerns. Second, and more importantly, the orchestration engine acts as a giant coupling point—no part of the architecture can have different architecture characteristics than the mediator that orchestrates all behavior. Thus, this architecture manages to find the disadvantages of both monolithic and distributed architectures.
+
+![Ratings for service-oriented architecture](../misc/fundamentals_of_software_architecture/c16/fig16_3.png)
+
+Modern engineering goals such as deployability and testability score disastrously in this architecture, both because they were poorly supported and because those were not important (or even aspirational) goals during that era.
+
+# Chapter 17. Microservices Architecture
