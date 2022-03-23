@@ -34,3 +34,24 @@ List of window functions
 **Ranking functions**: these functions are useful for ranking rows within its partition.
 
 **Value functions**: these functions allow you to compare values from previous or following rows within the partition or the first or last value within the partition.
+
+**Using the frame_clause**
+
+ROWS BETWEEN <starting_row> AND <ending_row>
+
+In the <starting_row> and <ending row>, we have the following options at our disposal:
+
+    UNBOUNDED PRECEDING — all rows before the current row in the partition, i.e. the first row of the partition
+    [some #] PRECEDING — # of rows before the current row
+    CURRENT ROW — the current row
+    [some #] FOLLOWING — # of rows after the current row
+    UNBOUNDED FOLLOWING — all rows after the current row in the partition, i.e. the last row of the partition
+
+Here’s some examples of how it could be written:
+
+    ROWS BETWEEN 3 PRECEDING AND CURRENT ROW — this means look back the previous 3 rows up to the current row.
+    ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING — this means look from the first row of the partition to 1 row after the current row
+    ROWS BETWEEN 5 PRECEDING AND 1 PRECEDING — this means look back the previous 5 rows up to 1 row before the current row
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING — this means look from the first row of the partition to the last row of the partition
+
+One worthy note is that anytime that you add an ORDER BY clause, SQL sets the default window as ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW.

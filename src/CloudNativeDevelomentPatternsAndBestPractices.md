@@ -430,7 +430,46 @@ Treat external systems like any other bounded isolated component. Create a compo
 
 
 ##  Event collaboration
-Publish domain events to trigger downstream commands and create a reactive chain of collaboration across multiple components.
+Publish **domain events** to trigger **downstream commands** and create a reactive chain of collaboration across multiple components.
 
 ![Collaboration](../misc/cloudnativedevelopmentpatterns/fig_collaboration.png)
+
+Redesign the user experience to be eventually consistent. Replace synchronous inter-component communication with asynchronous inter-component communication by using the event stream to publish events which trigger downstream commands. Upstream components apply the Database-First variant of the Event Sourcing pattern to publish domain events that reflect changes in their state. Downstream components react to the domain events by performing a command and publishing a domain event to reflect the outcome of the command.
+
+##  Event orchestration
+Leverage a mediator component to orchestrate collaboration between components without **event type coupling**.
+
+![Orchestration](../misc/cloudnativedevelopmentpatterns/fig_event_orchestration.png)
+
+Raw Event Collaboration explicitly couples consumer components to specific event types.
+
+However, raw Event Collaboration becomes less manageable, as the number of collaborations increases, as the complexity of collaborations increase, and as the number of event types increases.
+
+Create a component for each business process to act as a mediator between the collaborator components and orchestrate the collaboration flow across those components. Each component defines the events it will consume and publish independently of any business processes. The mediator maps and translates the published events of upstream components to the consumed events of downstream components. These mappings and translations are encapsulated in the mediator as a set of rules, which define the transitions in the collaboration flow.
+
+The primary benefit of this solution, over and above raw Event Collaboration, is that the collaborator components are completely decoupled.
+
+## Saga
+Trigger compensating transactions to undo changes in a multi-step flow when business rules are violated downstream.
+
+![Saga](../misc/cloudnativedevelopmentpatterns/fig_saga.png)
+
+Use compensating transactions to undo changes in a multi-step business process. Upstream components will publish domain events as they complete their steps to move a business process forward. A downstream component will publish an appropriate violation event when its business rules are violated to inform the upstream components that the process cannot proceed forward to completion. The upstream components react to the violation event by performing compensating transactions to undo the changes of the previous steps in the collaboration. The upstream components will, in turn, produce their own domain events to indicate the reversal has occurred, which may in turn trigger additional compensations. This cycle will continue until the system is eventually consistent.
+
+It is important to distinguish between business rule violations and error handling. The Stream Circuit Breaker pattern is responsible for error handling, while the Saga pattern is responsible for business rule violations. In essence, the objective of the Stream Circuit Breaker pattern is to keep events flowing forward, versus the objective of the Saga pattern, which is focused on reversing the effects of previous events.
+
+## Summary
+In this chapter, we discussed the control patterns of reactive, cloud-native systems. The Event Collaboration pattern replaces synchronous communication with asynchronous domain events, which successively trigger commands in downstream components, to resiliently choreograph long-running collaborations between boundary components. In the Event Orchestration pattern, we improve on the Event Collaboration pattern by creating mediator components to orchestrate the collaboration between decoupled boundary components. Finally, in the Saga pattern, we provide a long-running transaction mechanism based on compensation to undo the successful steps in these collaborations when later steps encounter business rule violations.
+
+# Deployment
+
+    Decoupling deployment from release
+    Multi-level roadmaps
+    Task branch workflow
+    Modern deployment pipelines
+    Zero-downtime deployment
+    Multi-regional deployment
+    Feature flags
+    Versioning
+    Trilateral API per containers
 
