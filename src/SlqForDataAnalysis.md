@@ -357,7 +357,7 @@ UNION removes duplicates from the result set, whereas UNION ALL retains all reco
 # Chapter 3. Time Series Analysis
 A time series is a sequence of measurements or data points recorded in time order, often at regularly spaced intervals.
 
-**Time series analysis is a way to understand and quantify how things change over time.**
+**Time series analysis is a way to understand and quantify how things change over time.** (trends)
 
 **Forecasting** is a common goal of time series analysis. Since time only marches forward, future values can be expressed as a function of past values, while the reverse is not true.
 
@@ -468,6 +468,41 @@ new_time
 ### Joining Data from Different Sources
 Dates and timestamps that are in different formats can be standardized with SQL. JOINing on dates or including date fields in UNIONs generally requires that the dates or timestamps be in the same format.
 
+## Trending the Data
+With time series data, we often want to look for trends in the data.
+A trend is simply the direction in which the data is moving. It may be moving up or increasing over time, or it may be moving down or decreasing over time. It can remain more or less flat, or there could be so much noise, or movement up and down, that it’s hard to determine a trend at all.
+
+### Simple trends
+Creating a trend may be a step in profiling and understanding data, or it may be the final output. The result set is a series of dates or timestamps and a numerical value.
+
+```
+SELECT sales_month
+,sales
+FROM retail_sales
+WHERE kind_of_business = 'Retail and food services sales, total'
+;
+
+sales_month  sales
+-----------  ------
+1992-01-01   146376
+1992-02-01   147079
+1992-03-01   159336
 
 
+SELECT date_part('year',sales_month) as sales_year   
+,sum(sales) as sales
+FROM retail_sales
+WHERE kind_of_business = 'Retail and food services sales, total'
+GROUP BY 1
+;
 
+sales_year  sales
+----------  -------
+1992.0      2014102
+1993.0      2153095
+1994.0      2330235
+...         ...
+```
+![Trend Yearly](../misc/sqlfordataanalysis/fig3.3_trend_yearly.png)
+
+### Comparing Components
