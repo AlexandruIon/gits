@@ -33,6 +33,7 @@ often organized to have a separate layer of software that is logically placed on
 top of the respective operating systems of the computers that are part of the
 system.
 ![Middleware](../misc/distributed_systems/c1/fig1_1.png)
+
 The distributed system provides the means for components of a single distributed application to communicate with each
 other, but also to let different applications communicate. At the same time, it hides, as best and reasonably as possible, the differences in hardware and
 operating systems from each application.</br>
@@ -264,7 +265,7 @@ to integrate applications independently from their databases. In particular, app
 and not merely by means of the request/reply behavior that was supported by transaction processing systems.</br>
 The main idea was that existing applications could directly exchange information.
 
-![Middleware as communication](../misc/distributed_systems/c1/fig1_12.png)
+![Middleware as communication](../misc/distributed_systems/c1/fig1_13.png)
 
 Several types of communication middleware exist. With remote procedure calls (RPC), an application component can effectively send a request to another
 application component by doing a local procedure call, which results in the request being packaged as a message and sent to the callee. Likewise, the
