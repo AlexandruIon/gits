@@ -9,7 +9,8 @@
   * [2.1 Architectural styles](#2.1-Architectural-styles)
   * [2.2 Middleware organization](#2.2-Middleware-organization)
   * [2.3 System architecture](#2.3-System-architecture)
-* [Setup](#setup)
+* [Processes](#Processes)
+  * [3.1 Threads](#3.1-Threads)
 
 # Introduction
 
@@ -580,4 +581,824 @@ To download a file, a user needs to access a global directory, which is generall
 references to what are called torrent files. A **torrent file** contains the information that is needed to download a specific file. In particular, it contains a link
 to what is known as a **tracker**, which is a server that is keeping an accurate account of active nodes that have (chunks of) the requested file.
 
+# Processes
+https://www.cs.uic.edu/~jbell/CourseNotes/OperatingSystems/3_Processes.html
+The concept of a process originates from the field of operating systems where it is generally defined as a program in execution.
 
+As it turns out, threads play a crucial role in obtaining performance
+in multicore and multiprocessor environments, but also help in structuring
+clients and servers. There are many cases where we see threads being replaced
+by processes and using the underlying operating system for guaranteeing
+protection and facilitating communication. Nevertheless, when performance
+is at stake, threads continue to play an important role.
+
+An important issue, especially in wide-area distributed systems, is moving
+processes between different machines. Process migration or more specifically,
+code migration, can help in achieving scalability, but can also help to dynamically
+configure clients and servers.
+
+## Threads
+
+Instead, it turns out that having a finer granularity in the form of multiple threads of control per process makes it much easier to build distributed applications
+and to get better performance.
+
+### Introduction to threads
+To understand the role of threads in distributed systems, it is important to understand
+what a process is, and how processes and threads relate. To execute
+a program, an operating system creates a number of **virtual processors**, each
+one for running a different program. To keep track of these virtual processors,
+the operating system has a **process table**, containing entries to store CPU
+register values, memory maps, open files, accounting information, privileges,
+etc. Jointly, these entries form a **process context**.
+
+A **process context** can be viewed as the software analog of the hardware’s
+**processor context**. The latter consists of the minimal information that is
+automatically stored by the hardware to handle an interrupt, and to later
+return to where the CPU left off. The processor context contains at least the
+program counter, but sometimes also other register values such as the stack
+pointer.
+
+**A process** is often defined as a program in execution, that is, a program
+that is currently being executed on one of the operating system’s virtual
+processors. An important issue is that the operating system takes great care
+to ensure that independent processes cannot maliciously or inadvertently
+affect the correctness of each other’s behavior. In other words, the fact
+that multiple processes may be concurrently sharing the same CPU and
+other hardware resources is made transparent. Usually, the operating system
+requires hardware support to enforce this separation.
+
+This **concurrency transparency** comes at a price. For example, each time a
+process is created, the operating system must create a complete independent
+address space. Allocation can mean initializing memory segments by, for
+example, zeroing a data segment, copying the associated program into a text
+segment, and setting up a stack for temporary data. Likewise, switching the
+CPU between two processes may require some effort as well. Apart from
+saving the data as currently stored in various registers (including the program
+counter and stack pointer), the operating system will also have to modify
+registers of the memory management unit (MMU) and invalidate address
+translation caches such as in the translation lookaside buffer (TLB). In addition,
+if the operating system supports more processes than it can simultaneously
+hold in main memory, it may have to swap processes between main memory
+and disk before the actual switch can take place.
+
+Like a process, a thread executes its own piece of code, independently
+from other threads. However, in contrast to processes, no attempt is made
+to achieve a high degree of concurrency transparency if this would result in
+performance degradation. **Therefore, a thread system generally maintains only
+the minimum information to allow a CPU to be shared by several threads**. In
+particular, a **thread context** often consists of nothing more than the processor
+context, along with some other information for thread management. For
+example, a thread system may keep track of the fact that a thread is currently
+blocked on a mutex variable, so as not to select it for execution. Information
+that is not strictly necessary to manage multiple threads is generally ignored.
+For this reason, protecting data against inappropriate access by threads within
+a single process is left entirely to application developers. We thus see that a
+processor context is contained in a thread context, and that, in turn, a thread
+context is contained in a process context.
+
+### Thread usage in nondistributed systems
+The most important benefit comes from the fact that in a single-threaded
+process, whenever a blocking system call is executed, the process as a whole is
+blocked.
+
+Another advantage of multithreading is that it becomes possible to exploit
+parallelism when executing the program on a multiprocessor or multicore
+system.
+
+Multithreading is also useful in the context of large applications. Such
+applications are often developed as a collection of cooperating programs,
+each to be executed by a separate process. This approach is typical for a
+Unix environment. Cooperation between programs is implemented by means
+of **interprocess communication (IPC)** mechanisms. For Unix systems, these
+mechanisms typically include (named) pipes, message queues, and shared
+memory segments.
+
+The major drawback of all IPC mechanisms is that communication often requires relatively extensive context switching.
+
+Because IPC requires kernel intervention, a process will generally first
+have to switch from user mode to kernel mode, shown as S1 in Figure 3.1.
+This requires changing the memory map in the MMU, as well as flushing the
+TLB. Within the kernel, a process context switch takes place (S2 in the figure),
+after which the other party can be activated by switching from kernel mode to
+user mode again
+
+![Context switch](../misc/distributed_systems/c3/fig3.1_ContextSwitch.PNG)
+
+Instead of using processes, an application can also be constructed such
+that different parts are executed by separate threads. Communication between
+those parts is entirely dealt with by using shared data. Thread switching can
+sometimes be done entirely in user space, although in other implementations,
+the kernel is aware of threads and schedules them. The effect can be a dramatic
+improvement in performance.
+
+### Thread implementation
+
+Threads are often provided in the form of a **thread package**. Such a package
+contains operations to create and destroy threads as well as operations on
+synchronization variables such as mutexes and condition variables. There are
+basically two approaches to implement a thread package. The first approach
+is to construct a **thread library that is executed entirely in user space**. The
+second approach is to **have the kernel be aware of threads and schedule them**.
+
+A **user-level thread library** has a number of advantages. First, it is cheap
+to create and destroy threads. Because all thread administration is kept in the
+user’s address space, the price of creating a thread is primarily determined
+by the cost for allocating memory to set up a thread stack. Analogously,
+destroying a thread mainly involves freeing memory for the stack, which is
+no longer used. Both operations are cheap.
+
+A second advantage of user-level threads is that switching thread context
+can often be done in just a few instructions. Basically, only the values of
+the CPU registers need to be stored and subsequently reloaded with the
+previously stored values of the thread to which it is being switched. There is
+no need to change memory maps, flush the TLB, do CPU accounting, and so
+on. Switching thread context is done when two threads need to synchronize,
+for example, when entering a section of shared data.
+
+A major drawback of user-level threads comes from deploying the **many-to-
+one threading model**: multiple threads are mapped to a single schedulable
+entity. As a consequence, the invocation of a blocking system call will immediately
+block the entire process to which the thread belongs, and thus also all the
+other threads in that process. As we explained, threads are particularly useful
+to structure large applications into parts that could be logically executed at
+the same time. In that case, blocking on I/O should not prevent other parts to
+be executed in the meantime. For such applications, user-level threads are of
+no help.
+
+These problems can be mostly circumvented by implementing threads in
+the operating system’s kernel, leading to what is known as the **one-to-one
+threading model** in which every thread is a schedulable entity. The price to
+pay is that every thread operation (creation, deletion, synchronization, etc.),
+will have to be carried out by the kernel, requiring a system call. Switching
+thread contexts may now become as expensive as switching process contexts.
+However, in light of the fact that the performance of context switching is generally
+dictated by ineffective use of memory caches, and not by the distinction
+between the many-to-one or one-to-one threading model, many operating
+systems now offer the latter model, if only for its simplicity.
+
+Using processes instead of threads has
+the important advantage of separating the data space: each process works on
+its own part of data and is protected from interference from others through
+the operating system.Using processes, data spaces, in the end, are protected by
+hardware support. If a process attempts to access data outside its allocated
+memory, the hardware will raise an exception, which is then further processed
+by the operating system. No such support is available for threads concurrently
+operating within the same process.
+
+### Threads in distributed systems
+#### Multithreaded clients
+#### Multithreaded servers
+
+## Virtualization
+
+This separation between having a single CPU and being able to pretend
+there are more can be extended to other resources as well, leading to what
+is known as resource virtualization.
+
+### Principle of virtualization
+**In its essence, virtualization deals with extending or replacing an existing interface so as to mimic the behavior of another system**
+
+![Virtualization](../misc/distributed_systems/c3/fig3.6_virtualization.PNG)
+
+#### Virtualization and distributed systems
+
+One of the most important reasons for introducing virtualization back in the
+1970s, was to allow legacy software to run on expensive mainframe hardware.
+The software not only included various applications, but in fact also the
+operating systems they were developed for.
+
+However, matters have changed again since the
+late 1990s. First, while hardware and low-level systems software change
+reasonably fast, software at higher levels of abstraction (e.g., middleware and
+applications), are often much more stable. In other words, we are facing
+the situation that legacy software cannot be maintained in the same pace as
+the platforms it relies on. Virtualization can help here by porting the legacy
+interfaces to the new platforms and thus immediately opening up the latter
+for large classes of existing programs.
+
+Virtualization can help a lot: the diversity of platforms and
+machines can be reduced by essentially letting each application run on its
+own virtual machine, possibly including the related libraries and operating
+system, which, in turn, run on a common platform.
+
+These arguments are still valid, and indeed,
+**portability** is perhaps the most important reason why virtualization plays
+such a key role in many distributed systems.
+
+#### Types of virtualization
+To understand the differences in virtualization, it is important to realize that
+computer systems generally offer four different types of interfaces, at three
+different levels:
+
+1. An interface between the hardware and software, referred to as the instruction
+   set architecture (ISA), forming the set of machine instructions.
+   This set is divided into two subsets:
+   • Privileged instructions, which are allowed to be executed only by
+   the operating system.
+   • General instructions, which can be executed by any program.
+2. An interface consisting of system calls as offered by an operating system.
+3. An interface consisting of library calls, generally forming what is known
+   as an application programming interface (API). In many cases, the
+   aforementioned system calls are hidden by an API.
+
+![Virtualization](../misc/distributed_systems/c3/fig3.8-9_virtual.PNG)
+
+Virtualization can take place in two different ways. First, we can build a
+runtime system that essentially provides an abstract instruction set that is to
+be used for executing applications.
+This type of virtualization, shown in Figure 3.8(a), **process virtual machine**, stressing that virtualization **is only for a single process**.
+
+An alternative approach toward virtualization, shown in Figure 3.8(b),
+is to provide a system that is implemented as a layer shielding the original
+hardware, but offering the complete instruction set of that same (or other
+hardware) as an interface. This leads to what is known as a **native virtual
+machine monitor**. It is called native because it is implemented directly on
+top of the underlying hardware. Note that the interface offered by a virtual
+machine monitor can be offered simultaneously to different programs. As
+a result, it is now possible to have multiple, and **different guest operating
+systems run independently and concurrently on the same platform**.
+
+A native virtual machine monitor will have to provide and regulate access
+to various resources, like external storage and networks. Like any operating
+system, this implies that it will have to implement device drivers for those
+resources. Rather than doing all this effort anew, a **hosted virtual machine
+monitor** will run on top of a trusted **host operating system** as shown in
+Figure 3.8(c). In this case, the virtual machine monitor can make use of existing
+facilities provided by that host operating system. It will generally have to be
+given special privileges instead of running as a user-level application. Using
+a hosted virtual machine monitor is highly popular in modern distributed
+systems such as data centers and clouds.
+
+Virtual machines are becoming increasingly important in the context of reliability and security for
+(distributed) systems. As they allow for the isolation of a complete application and its environment, a failure caused by an error or security attack need no
+longer affect a complete machine. In addition, as we also mentioned before, portability is greatly improved as virtual machines provide a further decoupling
+between hardware and software, allowing a complete environment to be moved from one machine to another.
+
+### Application of virtual machines to distributed systems
+From the perspective of distributed systems, the most important application of virtualization lies in cloud computing.
+
+• Infrastructure-as-a-Service (IaaS) covering the basic infrastructure
+• Platform-as-a-Service (PaaS) covering system-level services
+• Software-as-a-Service (SaaS) containing actual applications
+
+Virtualization plays a key role in IaaS. Instead of renting out a physical
+machine, a cloud provider will rent out a virtual machine (monitor) that
+may, or may not, be sharing a physical machine with other customers. The
+beauty of virtualization is that it allows for almost complete isolation between
+customers, who will indeed have the illusion that they have just rented a
+dedicated physical machine.
+
+## Clients
+
+### Networked user interfaces
+
+## Servers
+
+### General design issues
+
+#### Concurrent versus iterative servers
+In the case of an **iterative server**,
+the server itself handles the request and, if necessary, returns a response to the
+requesting client. A **concurrent server** does not handle the request itself, but
+passes it to a separate thread or another process, after which it immediately
+waits for the next incoming request.
+
+#### Contacting a server: end points
+In all cases, clients send requests to an end point, also called a port, at the machine where the server is running. Each server listens to a specific end point.
+
+![Client-Server Binding](../misc/distributed_systems/c3/fig3.13_clinet_server_biding.PNG)
+
+For example, the inetd daemon in Unix listens to a number of well-known ports for Internet services. When a request comes in, the daemon forks a process to handle it.
+
+#### Interrupting a server
+A much better approach for handling communication interrupts is to develop the client and server such that it is possible to send **out-of-band** data, which is data that is to be processed by the server before any other data
+from that client. One solution is to let the server listen to a separate control end point to which the client sends out-of-band data, while at the same time
+listening (with a lower priority) to the end point through which the normal data passes.
+
+#### Stateless versus stateful servers
+
+### Object servers
+
+# Communication
+Communication in distributed systems has traditionally always been based on low-level message passing as offered by the underlying network. Expressing communication
+through message passing is harder than using primitives based on shared memory, as available for nondistributed platforms.
+
+## Foundations
+
+### Layered Protocols
+Due to the absence of shared memory, all communication in distributed systems is based on sending and receiving (low level) messages.
+
+#### The OSI reference model
+It should be emphasized that the protocols that were developed as part of the OSI model were never widely used and are essentially dead.
+
+Standard rules that govern the format, contents, and meaning of the messages sent and received.These rules are formalized in what are called **communication protocols**.
+
+![OSI](../misc/distributed_systems/c4/fig4.1_OSI.PNG)
+
+![TCP/IP](../misc/distributed_systems/c4/tcpAndOSI.png)
+
+**Physical layer** Deals with standardizing how two computers are connected
+and how 0s and 1s are represented.
+**Data link layer** Provides the means to detect and possibly correct transmission
+errors, as well as protocols to keep a sender and receiver in the
+same pace.
+**Network layer** Contains the protocols for routing a message through a computer
+network, as well as protocols for handling congestion.
+**Transport layer** Mainly contains protocols for directly supporting applications,
+such as those that establish reliable communication, or support
+real-time streaming of data.
+**Session layer** Provides support for sessions between applications.
+**Presentation layer** Prescribes how data is represented in a way that is independent
+of the hosts on which communicating applications are running.
+**Application layer** Essentially, everything else: e-mail protocols, Web access
+protocols, file-transfer protocols, and so on.
+
+#### Middleware protocols
+Middleware is an application that logically lives (mostly) in the OSI application layer, but which contains many general-purpose protocols that warrant their
+own layers, independent of other, more specific applications. Let us briefly look at some examples.
+
+The Domain Name System (DNS).In terms of the OSI reference model, DNS is an application and therefore is logically placed in the application layer
+
+These protocol examples are not directly tied to communication, yet there
+are also many middleware communication protocols. For example, with
+a so-called remote procedure call, a process is offered a facility to locally
+call a procedure that is effectively implemented on a remote machine. This
+communication service belongs to one of the oldest types of middleware
+services and is used for realizing access transparency.
+
+#### Types of Communication
+high-level middleware communication services
+
+## Remote procedure call
+The idea behind RPC is to make a remote procedure call look as much as
+possible like a local one. In other words, we want RPC to be transparent—the
+calling procedure should not be aware that the called procedure is executing
+on a different machine or vice versa.
+
+![RPC](../misc/distributed_systems/c4/fig4.2_RPC.PNG)
+
+1. The client procedure calls the client stub in the normal way.
+2. The client stub builds a message and calls the local operating system.
+3. The client’s OS sends the message to the remote OS.
+4. The remote OS gives the message to the server stub.
+5. The server stub unpacks the parameter(s) and calls the server.
+6. The server does the work and returns the result to the stub.
+7. The server stub packs the result in a message and calls its local OS.
+8. The server’s OS sends the message to the client’s OS.
+9. The client’s OS gives the message to the client stub.
+10. The stub unpacks the result and returns it to the client.
+
+### Parameter passing
+Packing parameters into a message is called parameter marshaling.
+
+The Intel format is called **little endian** and the (older) ARM
+format is called **big endian**. Byte ordering is also important for networking:
+also here we can witness that machines may use a different ordering when
+transmitting (and thus receiving) bits and bytes. However, big endian is what
+is normally used for transferring bytes across a network.
+
+Marshaling and unmarshaling is all about this transformation to neutral
+formats and forms an essential part of remote procedure calls.
+We now come to a difficult problem: How are pointers, or in general,
+references passed?
+
+The problem with pointers and references as discussed so far, is that
+they make only locally sense: they refer to memory locations that have
+meaning only to the calling process.
+
+### RPC-based application support
+
+From what we have explained so far, it is clear that hiding a remote procedure
+call requires that the caller and the callee agree on the format of the messages
+they exchange and that they follow the same steps when it comes to, for
+example, passing complex data structures.
+
+There are at least two ways in which RPC-based application development can
+be supported.
+
+The first one is to let a developer specify exactly what needs
+to be called remotely, from which complete client-side and server-side stubs
+can be generated.
+
+A second approach is to embed remote procedure calling
+as part of a programming-language environment.
+
+#### Stub generation
+Defining the message format is one aspect of an RPC protocol, but it
+is not sufficient. What we also need is the client and the server to agree
+on the representation of simple data structures, such as integers, characters,
+Booleans, etc. For example, the protocol could prescribe that integers are
+represented in two’s complement, characters in 16-bit Unicode, and floats in
+the IEEE standard #754 format, with everything stored in little endian. With
+this additional information, messages can be unambiguously interpreted
+
+With the encoding rules now pinned down to the last bit, the only thing
+that remains to be done is that the caller and callee agree on the actual
+exchange of messages. For example, it may be decided to use a connectionoriented
+transport service such as TCP/IP. An alternative is to use an unreliable
+datagram service and let the client and server implement an error control
+scheme as part of the RPC protocol. In practice, several variants exist, and it
+is up to the developer to indicate the preferred underlying communication
+service.
+
+#### Language-based support
+A well-known example in which remote procedure calling is fully embedded
+is Java, where an RPC is referred to as a remote method invocation
+(RMI). In essence, a client being executed by its own (Java) virtual machine
+can invoke a method of an object managed by another virtual machine
+
+## Message-oriented communication
+Remote procedure calls and remote object invocations contribute to hiding
+communication in distributed systems, that is, they enhance **access transparency**.
+
+Likewise, the inherent synchronous nature of RPCs, by which a client is blocked until
+its request has been processed, may need to be replaced by something else.
+
+### Simple transient messaging with sockets
+Many distributed systems and applications are built directly on top of the
+simple message-oriented model offered by the transport layer.
+
+To better understand and appreciate the message-oriented systems as part of middleware
+solutions, we first discuss messaging through transport-level sockets.
+
+As an example, we briefly discuss the **socket interface** as introduced in the 1970s in Berkeley
+Unix, and which has been adopted as a POSIX standard.
+
+Conceptually, a **socket** is a communication end point to which an application can write data that are to be sent out over the underlying network, and
+from which incoming data can be read. A socket forms an abstraction over theactual port that is used by the local operating system for a specific transport
+protocol. In the following text, we concentrate on the socket operations for TCP.
+
+![Socket](../misc/distributed_systems/c4/fig4.socket.PNG)
+
+Servers generally execute the first four operations, normally in the order given.
+
+![Connection oriented using sockets](../misc/distributed_systems/c4/fig4.19_connection_oriented_comm.PNG)
+
+### Advanced transient messaging
+The standard socket-based approach toward transient messaging is very basic and as such, rather brittle: a mistake is easily made. Furthermore, sockets
+essentially support only TCP or UDP, meaning that any extra facility for messaging needs to be implemented separately by an application programmer.
+In practice, we do often need more advanced approaches for message-oriented communication to make network programming easier, to expand beyond the
+functionality offered by existing networking protocols, to make better use of local resources, and so on.
+
+#### Using messaging patterns: ZeroMQ
+One approach toward making network programming easier is based on the observation that many messaging applications, or their components, can be effectively organized according to a few simple communication patterns. By
+subsequently providing enhancements to sockets for each of these patterns, it may become easier to develop a networked, distributed application.
+
+Like in the Berkeley approach, ZeroMQ also provides sockets through which all communication takes place. Actual message transmission generally
+takes place over TCP connections, and like TCP, all communication is essentially connection-oriented, meaning that a connection will first be set up
+between a sender and receiver before message transmission can take place. However, setting up, and maintaining connections is kept mostly under the
+hood: an application programmer need not bother with those issues. To further simplify matters, a socket may be bound to multiple addresses, effectively
+allowing a server to handle messages from very different sources through a single interface. For example, a server can listen to multiple ports
+using a single blocking receive operation. ZeroMQ sockets can thus support **many-to-one communication** instead of just **one-to-one communication** as is the
+case with standard Berkeley sockets. To complete the story: ZeroMQ sockets also support one-to-many communication, i.e., multicasting.
+
+Essential to ZeroMQ is that communication is asynchronous: a sender will normally continue after having submitted a message to the underlying communication
+subsystem. An interesting side effect of combining asynchronous with connection-oriented communication, is that a process can request a connection
+setup, and subsequently send a message even if the recipient is not yet up-and-running and ready to accept incoming connection requests, let alone
+incoming messages. What happens, of course, is that a connection request and subsequent messages are queued at the sender’s side, while a separate thread
+as part of ZeroMQ’s library will take care that eventually the connection is set up and messages are transmitted to the recipient.
+
+Simplifying matters, ZeroMQ establishes a higher level of abstraction in socket-based communication by **pairing sockets**: a specific type of socket used
+for sending messages is paired with a corresponding socket type for receiving messages. Each pair of socket types corresponds to a communication pattern.
+
+The three most important communication patterns supported by ZeroMQ are **request-reply**, **publish-subscribe**, and **pipeline**.
+
+The **request-reply pattern** is used in traditional client-server communication, like the ones normally used for remote procedure calls. A client
+application uses a **request socket** (of type REQ) to send a request message to a server and expects the latter to respond with an appropriate response.
+The server is assumed to use a **reply socket** (of type REP). The request-reply pattern simplifies matters for developers by avoiding the need to call the
+listen operation, as well as the accept operation. Moreover, when a server receives a message, a subsequent call to send is automatically targeted toward
+the original sender. Likewise, when a client calls the recv operation (for receiving a message) after having sent a message, ZeroMQ assumes the client is
+waiting for a response from the original recipient.
+
+In the case of a **publish-subscribe pattern**, clients subscribe to specific messages that are published by servers.
+In its simplest form, this pattern establishes multicasting messages from a server to several clients. The server is assumed to use a socket of type PUB,
+while each client must use SUB type sockets. Each client socket is connected to the socket of the server. By default, a client subscribes to no specific message.
+This means that as long as no explicit subscription is provided, a client will not receive a message published by the server.
+
+Finally, the **pipeline pattern** is characterized by the fact that a process wants to **push out** its results, assuming that there are other processes that
+want to **pull in** those results. The essence of the pipeline pattern is that a pushing process does not really care which other process pulls in its results:
+the first available one will do just fine. Likewise, any process pulling in results from multiple other processes will do so from the first pushing process
+making its results available. The intention of the pipeline pattern is thus seen to keep as many processes working as possible, pushing results through a
+pipeline of processes as quickly as possible.
+
+#### The Message-Passing Interface (MPI)
+Sockets were deemed insufficient for two reasons. First, they were at the **wrong level of abstraction**
+by supporting only simple send and receive operations. Second, sockets had been designed to communicate across networks using general-purpose
+**protocol stacks such as TCP/IP**. They were not considered suitable for the proprietary protocols developed for high-speed interconnection networks,
+such as those used in high-performance server clusters. Those protocols required an interface that could handle more advanced features, such as
+different forms of buffering and synchronization.
+
+The need to be hardware and platform independent eventually lead to the definition of a standard for message passing, simply called the **Message-
+Passing Interface** or MPI. MPI is designed for parallel applications and as such is tailored to transient communication. It makes direct use of the
+underlying network. Also, it assumes that serious failures such as process crashes or network partitions are fatal and do not require automatic recovery.
+
+MPI assumes communication takes place within a known group of processes. Each group is assigned an identifier. Each process within a group is
+also assigned a (local) identifier. A (groupID, processID) pair therefore uniquely identifies the source or destination of a message, and is used instead of a
+transport-level address. There may be several, possibly overlapping groups of processes involved in a computation and that are all executing at the same
+time.
+
+### Message-oriented persistent communication
+We now come to an important class of message-oriented middleware services, generally known as message-queuing systems, or just Message-Oriented
+Middleware (MOM).
+
+Message-queuing systems provide extensive support for persistent asynchronous communication. The essence of these systems is that
+they offer intermediate-term storage capacity for messages, without requiring either the sender or receiver to be active during message transmission. An
+important difference with sockets and MPI is that message-queuing systems are typically targeted to support message transfers that are allowed to take
+minutes instead of seconds or milliseconds.
+
+#### Message-queuing model
+The basic idea behind a message-queuing system is that applications communicate
+by inserting messages in specific queues. These messages are forwarded
+over a series of communication servers and are eventually delivered to the
+destination, even if it was down when the message was sent. In practice, most
+communication servers are directly connected to each other. In other words, a
+message **is generally transferred directly to a destination server**. In principle,
+each application has its own private queue to which other applications can
+send messages. A queue can be read only by its associated application, but it
+is also possible for multiple applications to share a single queue.
+
+An important aspect of message-queuing systems is that a sender is generally
+given only the guarantees that its message will eventually be inserted
+in the recipient’s queue. No guarantees are given about when, or even if
+the message will actually be read, which is completely determined by the
+behavior of the recipient.
+
+These semantics permit communication to be loosely coupled in time.
+There is thus no need for the receiver to be executing when a message is being
+sent to its queue. Likewise, there is no need for the sender to be executing
+at the moment its message is picked up by the receiver. The sender and
+receiver can execute completely independently of each other. In fact, once a
+message has been deposited in a queue, it will remain there until it is removed,
+irrespective of whether its sender or receiver is executing.
+
+![Messaging Queue](../misc/distributed_systems/c4/fig4.26_messaging_queue.PNG)
+
+Messages can, in principle, contain any data. The only important aspect
+from the perspective of middleware is that messages are properly addressed.
+In practice, addressing is done by providing a systemwide unique name of the
+destination queue. In some cases, message size may be limited, although it is
+also possible that the underlying system takes care of fragmenting and assembling
+large messages in a way that is completely transparent to applications.
+
+![PubSub](../misc/distributed_systems/c4/fig4.24_pub_sub_ic.PNG)
+
+#### General architecture of a message-queuing system
+Queues are managed by **queue managers**. **A queue manager
+is either a separate process, or is implemented by means of a library that is
+linked with an application**. Secondly, as a rule of thumb, an application can
+**put messages only into a local queue**. Likewise, getting a message is possible
+by **extracting it from a local queue only**. As a consequence, if a queue manager
+QMA handling the queues for an application A runs as a separate process,
+both processes QMA and A will generally be placed on the same machine, or
+at worst on the same LAN. Also note that if all queue managers are linked
+into their respective applications, we can no longer speak of a persistent
+asynchronous messaging system.
+
+If applications can put messages only into local queues, then clearly each
+message will have to carry information concerning its destination. It is the
+queue manager’s task to make sure that a message reaches its destination.
+This brings us to a number of issues.
+
+![QueueLevelNaming](../misc/distributed_systems/c4/fig4.28_queue_level_naming.PNG)
+
+In the first place, we need to consider how the destination queue is addressed.
+Obviously, to enhance location transparency, it is preferable that
+queues have logical, location-independent names. Assuming that a queue manager
+is implemented as a separate process, using logical names implies that
+each name should be associated with a **contact address**, such as a (host,port)-
+pair, and that the name-to-address mapping is readily available to a queue
+manager.
+
+A second issue that we need to consider is how the name-to-address
+mapping is actually made available to a queue manager. A common approach
+is to simply implement the mapping as a lookup table and copy that table
+to all managers.
+
+This brings us to a third issue, related to the problems of efficiently
+maintaining name-to-address mappings.
+In practice, there are often special queue
+managers that operate as routers: they forward incoming messages to other
+queue managers. In this way, a message-queuing system may gradually grow
+into a complete, application-level, overlay network.
+
+#### Message brokers
+An important application area of message-queuing systems is integrating
+existing and new applications into a single, coherent distributed information
+system. If we assume that communication with an application takes place
+through messages, then integration requires that applications can understand
+the messages they receive.
+
+The problem with this approach is that each time an application A is
+added to the system having its own messaging protocol, then for each other
+application B that is to communicate with A we will need to provide the means
+for converting their respective messages. In a system with N applications, we
+will thus need N  N messaging protocol converters.
+
+An alternative is to agree on a common messaging protocol, as is done
+with traditional network protocols. Unfortunately, this approach will generally
+not work for message-queuing systems. The problem is the level of abstraction
+at which these systems operate.
+
+Given these problems, the general approach is to learn to live with differences,
+and try to provide the means to make conversions as simple as possible.
+In message-queuing systems, conversions are handled by special nodes in a
+queuing network, known as **message brokers**. A message broker acts as an
+application-level gateway in a message-queuing system. Its main purpose is to
+convert incoming messages so that they can be understood by the destination
+application. Note that to a message-queuing system, a message broker is just
+another application. In other words, a message broker
+is generally not considered to be an integral part of the queuing system.
+
+![Message Broker](../misc/distributed_systems/c4/fig4.29_message_broker.PNG)
+
+A message broker can be as simple as a reformatter for messages.
+
+In a more advanced setting, a message broker may act as an applicationlevel
+gateway, in which information on the messaging protocol of several
+applications has been encoded. In general, for each pair of applications, we
+will have a separate subprogram capable of converting messages between the
+two applications.
+
+Finally, note that in many cases a message broker is used for advanced
+enterprise application integration (EAI).In
+this case, rather than (only) converting messages, a broker is responsible for
+matching applications based on the messages that are being exchanged. In
+such a publish-subscribe model, applications send messages in the form of
+publishing. In particular, they may publish a message on topic X, which is then
+sent to the broker. Applications that have stated their interest in messages
+on topic X, that is, who have subscribed to those messages, will then receive
+these messages from the broker. More advanced forms of mediation are also
+possible.
+
+At the heart of a message broker lies a repository of rules for transforming
+a message of one type to another. The problem is defining the rules and developing the plugins.
+
+## Multicast communication
+An important topic in communication in distributed systems is the support for
+sending data to multiple receivers, also known as multicast communication.
+For many years, this topic has belonged to the domain of network protocols,
+where numerous proposals for network-level and transport-level solutions
+have been implemented and evaluated.
+In practice, this involved a huge management effort, in
+many cases requiring human intervention. In addition, as long as there is
+no convergence of proposals, ISPs have shown to be reluctant to support
+multicasting.
+
+With the advent of peer-to-peer technology, and notably structured overlay
+management, it became easier to set up communication paths. As peer-to-peer
+solutions are typically deployed at the application layer, various applicationlevel
+multicasting techniques have been introduced.
+
+### Application-level tree-based multicasting
+The basic idea in application-level multicasting is that nodes organize into
+an overlay network, which is then used to disseminate information to its
+members. An important observation is that **network routers are not involved
+in group membership**. As a consequence, the connections between nodes in
+the overlay network may cross several physical links, and as such, routing
+messages within the overlay may not be optimal in comparison to what could
+have been achieved by network-level routing.
+
+A crucial design issue is the construction of the overlay network:
+* nodes may organize themselves directly into a tree,  meaning that there is a unique (overlay) path between every pair of nodes.
+* nodes organize into a mesh network in which  every node will have multiple neighbors and, in general, there exist multiple  paths between every pair of nodes
+
+The main difference between the two is that the latter generally provides higher robustness: if a connection breaks
+(e.g., because a node fails), there will still be an opportunity to disseminate information without having to immediately reorganize the entire overlay
+network.
+
+#### Performance issues in overlays
+From the high-level description given above, it should be clear that although building a tree by itself is not that difficult once we have organized the nodes
+into an overlay, building an efficient tree may be a different story.
+
+![Multicast network level](../misc/distributed_systems/c4/fig4.35_multicast_overlaty_network.PNG)
+
+The quality of an application-level multicast tree is generally measured by three different metrics: **link stress**, **stretch**, and **tree cost**.
+
+To simplify matters somewhat, assume that a multicast group has an associated and well-known node that keeps track of the nodes that have joined
+the tree. When a new node issues a join request, it contacts this **rendezvous node** to obtain a (potentially partial) list of members. The goal is to select
+the best member that can operate as the new node’s parent in the tree.
+
+### Flooding-based multicasting
+So far, we have assumed that when a message is to be multicast, it is to be received by every node in the overlay network. Strictly speaking, this
+corresponds to **broadcasting**. In general, multicasting refers to sending a message to a subset of all the nodes, that is, a specific **group of nodes**. A
+key design issue when it comes to multicasting is to minimize the use of intermediate nodes for which the message is not intended. To make this clear,
+if the overlay is organized as a multi-level tree, yet only the leaf nodes are the ones who should receive a multicast message, then clearly there may be quite
+some nodes who need to store and subsequently forward a message that is not meant for them.
+
+One simple way to avoid such inefficiency, is to construct an overlay network per **multicast group**. As a consequence, multicasting a message m to a
+group G is the same as broadcasting m to G. The drawback of this solution is that a node belonging to several groups, will, in principle, need to maintain a
+separate list of its neighbors for each group of which it is a member.
+
+If we assume that an overlay corresponds to a multicast group, and thus
+that we need to broadcast a message, a naive way of doing so is to apply
+**flooding**. In this case, each node simply forwards a message m to each of its
+neighbors, except to the one from which it received m. Furthermore, if a node
+keeps track of the messages it received and forwarded, it can simply ignore
+duplicates. We will roughly see twice as many messages being sent as there
+are links in the overlay network, making flooding quite inefficient.
+
+When dealing with a structured overlay, that is, one having a more or less
+deterministic topology, designing efficient flooding schemes is simpler.
+
+### Gossip-based data dissemination
+An important technique for disseminating information is to rely on **epidemic
+behavior**, also referred to as **gossiping**. Observing how diseases spread
+among people, researchers have since long investigated whether simple techniques
+could be developed for spreading information in very large-scale
+distributed systems. The main goal of these epidemic protocols is to rapidly
+propagate information among a large collection of nodes using only local information.
+In other words, there is no central component by which information
+dissemination is coordinated.
+
+#### Information dissemination models
+
+Using the terminology from epidemics, a node that is part of a distributed
+system is called **infected** if it holds data that it is willing to spread to other
+nodes. A node that has not yet seen this data is called **susceptible**. Finally, an
+updated node that is not willing or able to spread its data is said to have been
+**removed**.
+
+A popular propagation model is that of **anti-entropy**. In this model, a
+node P picks another node Q at random, and subsequently exchanges updates
+with Q. There are three approaches to exchanging updates:
+1. P only pulls in new updates from Q
+2. P only pushes its own updates to Q
+3. P and Q send updates to each other (i.e., a push-pull approach)
+
+When it comes to rapidly spreading updates, only pushing updates turns
+out to be a bad choice. Intuitively, this can be understood as follows. First,
+note that in a pure push-based approach, updates can be propagated only by
+infected nodes. However, if many nodes are infected, the probability of each
+one selecting a susceptible node is relatively small. Consequently, chances are
+that a particular node remains susceptible for a long period simply because it
+is not selected by an infected node.
+In contrast, the pull-based approach works much better when many nodes
+are infected. In that case, spreading updates is essentially triggered by susceptible
+nodes. Chances are big that such a node will contact an infected one to
+subsequently pull in the updates and become infected as well.
+If only a single node is infected, updates will rapidly spread across all
+nodes using either form of anti-entropy, although push-pull remains the best strategy.
+Define a **round** as spanning a period in which
+every node will have taken the initiative once to exchange updates with
+a randomly chosen other node. It can then be shown that the number of
+rounds to propagate a single update to all nodes takes O(log(N)), where N
+is the number of nodes in the system. This indicates indeed that propagating
+updates is fast, but above all scalable.
+
+One specific variant of epidemic protocols is called **rumor spreading**. It
+works as follows. If node P has just been updated for data item x, it contacts
+an arbitrary other node Q and tries to push the update to Q. However, it is
+possible that Q was already updated by another node. In that case, P may
+lose interest in spreading the update any further, say with probability pstop. In
+other words, it then becomes removed.
+
+Rumor spreading turns out to be an excellent way of rapidly spreading
+news. However, it cannot guarantee that all nodes will actually be updated.
+
+One of the main advantages of epidemic algorithms is their scalability, due
+to the fact that the number of synchronizations between processes is relatively
+small compared to other propagation methods. For wide-area systems, Lin
+and Marzullo [1999] have shown that it makes sense to take the actual network
+topology into account to achieve better results. In that case, nodes that are
+connected to only a few other nodes are contacted with a relatively high
+probability. The underlying assumption is that such nodes form a bridge to
+other remote parts of the network; therefore, they should be contacted as soon
+as possible. This approach is referred to as **directional gossiping** and comes
+in different variants.
+
+This problem touches upon an important assumption that most epidemic
+solutions make, namely that a node can randomly select any other node to
+gossip with. This implies that, in principle, the complete set of nodes should
+be known to each member. In a large system, this assumption can never hold
+and special measures will need to be taken to mimic such properties.
+
+#### Removing data
+
+Epidemic algorithms are extremely good for spreading updates. However,
+they have a rather strange side-effect: spreading the deletion of a data item
+is hard. The essence of the problem lies in the fact that deletion of a data
+item destroys all information on that item. Consequently, when a data item
+is simply removed from a node, that node will eventually receive old copies
+of the data item and interpret those as updates on something it did not have
+before.
+
+The trick is to record the deletion of a data item as just another update, and
+keep a record of that deletion. In this way, old copies will not be interpreted
+as something new, but merely treated as versions that have been updated by
+a delete operation. The recording of a deletion is done by spreading **death
+certificates**.
+
+Of course, the problem with death certificates is that they should eventually
+be cleaned up, or otherwise each node will gradually build a huge local
+database of historical information on deleted data items that is otherwise not
+used. Demers et al. [1987] propose to use what are called dormant death
+certificates. Each death certificate is timestamped when it is created. If it can
+be assumed that updates propagate to all nodes within a known finite time,
+then death certificates can be removed after this maximum propagation time
+has elapsed.
+
+However, to provide hard guarantees that deletions are indeed spread to
+all nodes, only a very few nodes maintain dormant death certificates that are
+never thrown away. Assume node P has such a certificate for data item x.
+If by any chance an obsolete update for x reaches P, P will react by simply
+spreading the death certificate for x again.

@@ -3,9 +3,6 @@
 # Table of contents
 * [Chapter 1. Introduction](#Chapter-1.-Introduction)
 * [Chapter 2. Architectural Thinking](#Chapter-2.-Architectural-Thinking)
-    * [2.1 Architectural styles](#2.1-Architectural-styles)
-    * [2.2 Middleware organization](#2.2-Middleware-organization)
-    * [2.3 System architecture](#2.3-System-architecture)
 * [Chapter 3. Modularity](#Chapter-3.-Modularity)
 * [Chapter 4. Architecture Characteristics Defined](#Chapter-4.-Architecture-Characteristics-Defined)
 * [Chapter 5. Identifying Architectural Characteristics](#Chapter-5.-Identifying-Architectural-Characteristics)
@@ -713,7 +710,7 @@ Trade-off for this advantage, specifically with regard to overall simplicity and
 
 Space-based architecture is relatively expensive.
 
-![Ratings](../misc/fundamentals_of_software_architecture/c15/fig15_10.png)
+![Ratings](../misc/fundamentals_of_software_architecture/c15/fig15_11.png)
 
 # Chapter 16. Orchestration-Driven Service-Oriented Architecture
 
