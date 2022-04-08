@@ -11,6 +11,13 @@
   * [2.3 System architecture](#2.3-System-architecture)
 * [Processes](#Processes)
   * [3.1 Threads](#3.1-Threads)
+* [Communication](#Communication)
+* [Naming](#Naming)
+  * [Names, identifiers, and addresses](#Names,-identifiers,-and-addresses)
+  * [Flat naming](#Flat-naming)
+  * [Structured naming](#Structured-naming)
+  * [Attribute based naming](#Attribute-based-naming)
+* [Coordination](#Coordination)
 
 # Introduction
 
@@ -1402,3 +1409,838 @@ all nodes, only a very few nodes maintain dormant death certificates that are
 never thrown away. Assume node P has such a certificate for data item x.
 If by any chance an obsolete update for x reaches P, P will react by simply
 spreading the death certificate for x again.
+
+# Naming
+**Name resolution** thus allows a process to access the named entity. To resolve names, it is necessary to implement a naming system.
+
+## Names, identifiers, and addresses
+**A name** in a distributed system is a string of bits or characters that is used to refer to **an entity**(processes, hosts, printers, disks, and files).
+
+**To operate on an entity**, it is necessary to access it, for which we need an **access point**.
+An access point is yet another, but special, kind of entity in a distributed system.
+The **name** of an **access point** is called an **address**.
+
+An address is thus just a special kind of name: it refers to an access point of an entity.
+
+Therefore, it is much better to let a service be known by a separate name independent of the address of the associated server.
+
+These examples illustrate that a name for an entity that is independent from its addresses is often much easier and more flexible to use. Such a name
+is called **location independent**.
+
+A true **identifier** is a name that has the following properties:
+1. An identifier refers to at most one entity.
+2. Each entity is referred to by at most one identifier.
+3. An identifier always refers to the same entity (i.e., it is never reused).
+
+**Addresses** and **identifiers** are two important types of names that are each used for very different purposes. In many computer systems, addresses and
+identifiers are represented in **machine-readable form only**, that is, in the form of bit strings.
+For example, an Ethernet address is essentially a random string of 48 bits. Likewise, memory addresses are typically represented as 32-bit or
+64-bit strings.
+
+Another important type of name is that which is tailored to be used by
+humans, also referred to as **human-friendly names**. In contrast to addresses
+and identifiers, a human-friendly name is generally represented as a character
+string.
+
+**Having names, identifiers, and addresses brings us to the central theme of this chapter: how do we resolve names and identifiers to addresses?**
+It is important to realize that there is often a close relationship between name resolution in distributed systems and message routing
+In principle, a naming system maintains a **name-to-address binding** which in its simplest form is just a table of (name, address) pairs.
+
+## Flat naming
+Above, we explained that **identifiers** are convenient to uniquely represent
+entities. In many cases, identifiers are simply random bit strings, which we
+conveniently refer to as unstructured, or flat names. An important property
+of such a name is that it does not contain any information whatsoever on how
+to locate the access point of its associated entity. In the following, we will take
+a look at how flat names can be resolved, or, equivalently, how we can locate
+an entity when given only its identifier.
+
+### Simple solutions
+We first consider two simple solutions for locating an entity: broadcasting and
+forwarding pointers. Both solutions are mainly applicable only to local-area
+networks.
+
+#### Broadcasting
+A message containing the identifier of the entity is broadcast to each machine and each machine is
+requested to check whether it has that entity. Only the machines that can offer an access point for the entity send a reply message containing the address of
+that access point.
+
+This principle is used in the Internet **Address Resolution Protocol** (ARP)
+to find the data-link address of a machine when given only an IP address [Plummer,
+1982]. In essence, a machine broadcasts a packet on the local network
+asking who is the owner of a given IP address. When the message arrives at
+a machine, the receiver checks whether it should listen to the requested IP
+address. If so, it sends a reply packet containing, for example, its Ethernet
+address.
+
+Broadcasting becomes inefficient when the network grows.
+One possible solution is to switch to multicasting, by which only a restricted group of hosts receives the request. For example, Ethernet networks support data-link level
+multicasting directly in hardware.
+
+Multicasting can also be used to locate entities in point-to-point networks.
+For example, the Internet supports network-level multicasting by allowing
+hosts to join a specific multicast group. Such groups are identified by a
+**multicast address**. When a host sends a message to a multicast address, the
+network layer provides a best-effort service to deliver that message to all
+group members.
+
+#### Forwarding pointers
+The principle is simple: when an entity
+moves from A to B, it leaves behind in A a reference to its new location at B.
+The main advantage of this approach is its simplicity: as soon as an entity has
+been located, for example by using a traditional naming service, a client can
+look up the current address by following the chain of forwarding pointers.
+
+There are also drawbacks. First, if no special measures are taken, a chain
+for a highly mobile entity can become so long that locating that entity is
+prohibitively expensive. Second, all intermediate locations in a chain will have
+to maintain their part of the chain of forwarding pointers as long as needed.
+A third (and related) drawback is the vulnerability to broken links. As soon
+as any forwarding pointer is lost, the entity can no longer be reached. An
+important issue is, therefore, to keep chains relatively short, and to ensure
+that forwarding pointers are robust.
+
+### Home-based approaches
+A popular approach to supporting mobile entities in large-scale networks is
+to introduce a home location, which keeps track of the current location of an
+entity. Special techniques may be applied to safeguard against network or
+process failures. In practice, the home location is often chosen to be the place
+where an entity was created.
+
+The home-based approach is used as a fall-back mechanism for location
+services based on forwarding pointers.
+
+### Distributed hash tables
+Let us now take a closer look at how to resolve an identifier to the address of the associated entity.
+
+### Hierarchical approaches
+In a hierarchical scheme, a network is divided into a collection of **domains**.
+There is a single top-level domain that spans the entire network. Each domain
+can be subdivided into multiple, smaller subdomains. A lowest-level domain,
+called a **leaf domain**, typically corresponds to a local-area network in a
+computer network or a cell in a mobile telephone network. The general
+assumption is that within a smaller domain the average time it takes to
+transfer a message from one node to another is less than in a large domain.
+
+![Hierarhical](../misc/distributed_systems/c5/fig5.6_hierarchical_org.PNG)
+
+To keep track of the whereabouts of an entity, each entity currently located
+in a domain D is represented by a **location record** in the directory node
+dir(D)
+
+## Structured naming
+Flat names are good for machines, but are generally not very convenient
+for humans to use. As an alternative, naming systems generally support
+structured names that are composed from simple, human-readable names.
+Not only file naming, but also host naming on the Internet follows this
+approach.
+
+### Name spaces
+Names are commonly organized into what is called a **name space**.
+Name spaces for structured names can be represented as a labeled, directed graph
+with two types of nodes. A leaf node represents a named entity and has
+the property that it has no outgoing edges. A **leaf node** generally stores
+information on the entity it is representing–for example, its address–so that a
+client can access it. Alternatively, it can store the state of that entity, such as in
+the case of file systems in which a leaf node actually contains the complete
+file it is representing. We return to the contents of nodes below.
+
+In contrast to a leaf node, **a directory node** has a number of outgoing
+edges, each labeled with a name, as shown in Figure 5.11 Each node in a
+naming graph is considered as yet another entity in a distributed system,
+and, in particular, has an associated identifier. A directory node stores a table
+in which an outgoing edge is represented as a pair (node identifier, edge label).
+Such a table is called a directory table.
+
+![Naming Graph](../misc/distributed_systems/c5/fig5.11_naming_graph_with_a_single_root_node.PNG)
+
+The naming graph shown in Figure 5.11 has one node, namely n0, which
+has only outgoing and no incoming edges. Such a node is called the **root
+(node)** of the naming graph.
+If the first node in a path name is the root of the naming graph, it is
+called an **absolute path name**. Otherwise, it is called a **relative path name**.
+
+There are many different ways to organize a name space. As we mentioned,
+most name spaces have only a single root node. In many cases, a name space
+is also strictly hierarchical in the sense that the naming graph is organized as
+a tree. This means that each node except the root has exactly one incoming
+edge; the root has no incoming edges. As a consequence, each node also has
+exactly one associated (absolute) path name.
+
+The naming graph shown in Figure 5.11 is an example of directed acyclic
+graph. In such an organization, a node can have more than one incoming
+edge, but the graph is not permitted to have a cycle. There are also name
+spaces that do not have this restriction.
+
+### Name Resolution
+Name spaces offer a convenient mechanism for storing and retrieving information
+about entities by means of names. More generally, given a path name,
+it should be possible to look up any information stored in the node referred
+to by that name. The process of looking up a name is called **name resolution**.
+
+### The implementation of a name space
+A name space forms the heart of a naming service, that is, a service that
+allows users and processes to add, remove, and look up names. A naming
+service is implemented by name servers.
+
+#### Name space distribution
+usually organized hierarchically. As before, assume such a name space has
+only a single root node. To effectively implement such a name space, it
+is convenient to partition it into logical layers.
+
+The **global layer** is formed by highest-level nodes, that is, the root node
+and other directory nodes logically close to the root, namely its children.
+Nodes in the global layer are often characterized by their stability, in the
+sense that directory tables are rarely changed. Such nodes may represent
+organizations, or groups of organizations, for which names are stored in the
+name space.
+
+The **administrational layer** is formed by directory nodes that together are
+managed within a single organization. A characteristic feature of the directory
+nodes in the administrational layer is that they represent groups of entities
+that belong to the same organization or administrational unit.
+
+Finally, the **managerial layer** consists of nodes that may typically change
+regularly
+
+#### Example: The Domain Name System
+
+#### Example: The Network File System
+
+## Attribute based naming
+Flat and structured names generally provide a unique and location-independent way of referring to entities.
+However, location independence and human friendliness are not the only criterion for naming entities. In particular, as more information
+is being made available it becomes important to effectively search for entities. This approach requires that a user can provide merely a description of what
+he is looking for.
+
+There are many ways in which descriptions can be provided, but a popular one in distributed systems is to describe an entity in terms of (attribute, value)
+pairs, generally referred to as **attribute-based naming**.
+
+In this approach, an entity is assumed to have an associated collection of attributes. Each
+attribute says something about that entity. By specifying which values a
+specific attribute should have, a user essentially constrains the set of entities
+that he is interested in. It is up to the naming system to return one or more
+entities that meet the user’s description.
+
+### Directory services
+Attribute-based naming systems are also known as **directory services**, whereas
+systems that support structured naming are generally called **naming systems**.
+
+### Hierarchical implementations: LDAP
+A common approach to tackling distributed directory services is to combine
+structured naming with attribute-based naming.
+
+Many of these systems use, or rely on the **lightweight directory
+access protocol** commonly referred simply as LDAP.
+
+### Decentralized implementations
+
+## Summary
+Names are used to refer to entities. Essentially, there are three types of names.
+* An **address** is the name of an access point associated with an entity, also simply called the address of an entity.
+* An **identifier** is another type of name (each entity is referred to by exactly one identifier, an   identifier refers to only one entity, and is never assigned to another entity)
+* Finally, human-friendly names are targeted to be used by humans and as such are represented as character strings
+
+Given these types, we make a distinction between **flat naming**, **structured naming**, and **attribute-based naming**.
+
+Systems for flat naming essentially need to resolve an identifier to the
+address of its associated entity. This locating of an entity can be done in
+different ways. The first approach is to use broadcasting or multicasting. The
+identifier of the entity is broadcast to every process in the distributed system.
+The process offering an access point for the entity responds by providing an
+address for that access point. Obviously, this approach has limited scalability.
+
+A second approach is to use forwarding pointers. Each time an entity
+moves to a next location, it leaves behind a pointer telling where it will be
+next. Locating the entity requires traversing the path of forwarding pointers.
+To avoid large chains of pointers, it is important to reduce chains periodically
+
+A third approach is to allocate a home to an entity. Each time an entity
+moves to another location, it informs its home where it is. Locating an entity
+proceeds by first asking its home for the current location.
+A fourth approach is to organize all nodes into a structured peer-to-peer
+system, and systematically assign nodes to entities taking their respective
+identifiers into account. By subsequently devising a routing algorithm by
+which lookup requests are moved toward the node responsible for a given
+entity, efficient and robust name resolution is possible.
+
+A fifth approach is to build a hierarchical search tree. The network is
+divided into nonoverlapping domains. Domains can be grouped into higherlevel
+(nonoverlapping) domains, and so on. There is a single top-level domain
+that covers the entire network. Each domain at every level has an associated
+directory node. If an entity is located in a domain D, the directory node of the
+next higher-level domain will have a pointer to D. A lowest-level directory
+node stores the address of the entity. The top-level directory node knows
+about all entities.
+
+Structured names are easily organized in a name space. A name space
+can be represented by a naming graph in which a node represents a named
+entity and the label on an edge represents the name under which that entity
+is known. A node having multiple outgoing edges represents a collection of
+entities and is also known as a context node or directory. Large-scale naming
+graphs are often organized as rooted acyclic directed graphs.
+
+Naming graphs are convenient to organize human-friendly names in a
+structured way. An entity can be referred to by a path name. Name resolution
+is the process of traversing the naming graph by looking up the components
+of a path name, one at a time. A large-scale naming graph is implemented by
+distributing its nodes across multiple name servers. When resolving a path
+name by traversing the naming graph, name resolution continues at the next
+name server as soon as a node is reached implemented by that server.
+
+# Coordination
+In this chapter, we mainly concentrate on how processes can synchronize and coordinate their actions.
+
+Synchronization and coordination are two closely related phenomena. In
+**process synchronization** we make sure that one process waits for another to
+complete its operation. When dealing with **data synchronization**, the problem
+is to ensure that two sets of data are the same. When it comes to **coordination**,
+the goal is to manage the interactions and dependencies between activities
+in a distributed system. From this perspective,
+one could state that coordination encapsulates synchronization.
+
+## Clock synchronization
+The implications of the lack of global time
+
+### Physical clocks
+Nearly all computers have a circuit for keeping track of time. Despite the
+widespread use of the word “clock” to refer to these devices, they are not
+actually clocks in the usual sense. **Timer** is perhaps a better word. A computer
+timer is usually a precisely machined quartz crystal. When kept under tension,
+quartz crystals oscillate at a well-defined frequency that depends on the kind
+of crystal, how it is cut, and the amount of tension. Associated with each
+crystal are two registers, a **counter** and a **holding register**. Each oscillation of
+the crystal decrements the counter by one. When the counter gets to zero, an
+interrupt is generated and the counter is reloaded from the holding register.
+In this way, it is possible to program a timer to generate an interrupt 60 times
+a second, or at any other desired frequency. Each interrupt is called one **clock
+tick**.
+
+The basis for keeping global time is a called **Universal Coordinated Time**, but is abbreviated as UTC.
+
+### Clock synchronization algorithms
+All clocks are based on some harmonic oscillator: an object that resonates
+at a certain frequency and from which we can subsequently derive time.
+Atomic clocks are based on the transitions of the cesium 133 atom, which is
+not only very high, but also very constant. Hardware clocks in most computers
+use a crystal oscillator based on quartz, which is also capable of producing
+a very high, stable frequency, although not as stable as that of atomic clocks.
+A software clock in a computer is derived from that computer’s hardware
+clock. In particular, the hardware clock is assumed to cause an interrupt f
+times per second. When this timer goes off, the interrupt handler adds 1 to a
+counter that keeps track of the number of ticks (interrupts) since some agreedupon
+time in the past. This counter acts as a software clock C, resonating at
+frequency F.
+
+The whole idea of clock synchronization is that we keep clocks **precise**, referred
+to as **internal synchronization** or **accurate**, known as **external synchronization**.
+
+## Logical clocks
+In a seminal paper, Lamport [1978] showed that although clock synchronization
+is possible, it need not be absolute. If two processes do not interact,
+it is not necessary that their clocks be synchronized because the lack of synchronization
+would not be observable and thus could not cause problems.
+Furthermore, he pointed out that what usually matters is not that all processes
+agree on exactly what time it is, but rather that they agree on the order in which
+events occur.
+
+### Lamport’s logical clocks
+To synchronize logical clocks, Lamport defined a relation called **happens-before**.
+
+1. If a and b are events in the same process, and a occurs before b, then
+   a -> b is true.
+2. If a is the event of a message being sent by one process, and b is the
+   event of the message being received by another process, then a -> b is
+   also true. A message cannot be received before it is sent, or even at the
+   same time it is sent, since it takes a finite, nonzero amount of time to
+   arrive.
+
+Happens-before is a transitive relation.
+
+What we need is a way of measuring a notion of time such that for every event, a, we can assign it a time value C(a) on which all processes agree.
+These time values must have the property that if a -> b, then C(a) < C(b).
+In addition, the clock time, C, must always go forward (increasing), never
+backward (decreasing). Corrections to time can be made by adding a positive
+value, never by subtracting one.
+
+Lamport proposed for assigning times to events (**event counters**).
+
+The processes run on different machines, each with its own clock. For the sake of argument,
+we assume that a clock is implemented as a software counter: the counter
+is incremented by a specific value every T time units. However, the value
+by which a clock is incremented differs per process. The clock in process
+P1 is incremented by 6 units, 8 units in process P2, and 10 units in process
+P3, respectively.
+
+![Lamport Algorithm](../misc/distributed_systems/c6/fig6.8_lamport_algorithm.PNG)
+
+Lamport’s solution follows directly from the happens-before relation. Since
+m3 left at 60, it must arrive at 61 or later. Therefore, each message carries the
+sending time according to the sender’s clock. When a message arrives and
+the receiver’s clock shows a value prior to the time the message was sent,
+the receiver fast forwards its clock to be one more than the sending time.
+
+![Lamport in middleware](../misc/distributed_systems/c6/fig6.9_lamport_in_middleware.PNG)
+
+To implement Lamport’s logical clocks, each process Pi maintains a local
+counter Ci. These counters are updated according to the following steps
+```
+1. Before executing an event (i.e., sending a message over the network,
+delivering a message to an application, or some other internal event), Pi
+increments Ci: Ci   Ci + 1.
+2. When process Pi sends a message m to process Pj, it sets m’s timestamp
+ts(m) equal to Ci after having executed the previous step.
+3. Upon the receipt of a message m, process Pj adjusts its own local counter
+as Cj   maxfCj, ts(m)g after which it then executes the first step and
+delivers the message to the application.
+```
+
+In some situations, an additional requirement is desirable: **no two events ever
+occur at exactly the same time**. To achieve this goal, we also use the unique
+process identifier to break ties and use tuples instead of only the counter’s
+values. For example, an event at time 40 at process Pi will be timestamped as
+h40, ii. If we also have an event h40, ji and i < j, then h40, ii < h40, ji.
+
+#### Example: Total-ordered multicasting
+The problem that we are faced with is that the two update operations
+should have been performed in the same order at each copy. Although it
+makes a difference whether the deposit is processed before the interest update
+or the other way around, which order is followed is not important from a
+consistency point of view. The important issue is that both copies should be
+exactly the same. In general, situations such as these require a **total-ordered
+multicast**, that is, a multicast operation by which all messages are delivered
+in the same order to each receiver. Lamport’s logical clocks can be used to
+implement total-ordered multicasts in a completely distributed fashion.
+
+Consider a group of processes multicasting messages to each other. Each
+message is always timestamped with the current (logical) time of its sender.
+When a message is multicast, it is conceptually also sent to the sender. In
+addition, we assume that messages from the same sender are received in the
+order they were sent, and that no messages are lost.
+
+When a process receives a message, it is put into a local queue, ordered
+according to its timestamp. The receiver multicasts an acknowledgment to the
+other processes. Note that if we follow Lamport’s algorithm for adjusting local
+clocks, the timestamp of the received message is lower than the timestamp
+of the acknowledgment. The interesting aspect of this approach is that all
+processes will eventually have the same copy of the local queue (provided no
+messages are removed).
+
+A process can deliver a queued message to the application it is running
+only when that message is at the head of the queue and has been acknowledged
+by each other process. At that point, the message is removed from the
+queue and handed over to the application; the associated acknowledgments
+can simply be removed. Because each process has the same copy of the queue,
+all messages are delivered in the same order everywhere. In other words, we
+have established total-ordered multicasting.
+
+### Vector clocks
+Lamport’s logical clocks lead to a situation where all events in a distributed system are totally ordered with the property that if event a happened before
+event b, then a will also be positioned in that ordering before b, that is, C(a) < C(b).
+
+However, with Lamport clocks, nothing can be said about the relationship between two events a and b by merely comparing their time values C(a)
+and C(b), respectively. In other words, if C(a) < C(b), then this does not necessarily imply that a indeed happened before b. Something more is needed
+for that.
+```
+To explain, consider the messages as sent by the three processes shown
+in Figure 6.12. Denote by Tsnd(mi) the logical time at which message mi was
+sent, and likewise, by Trcv(mi) the time of its receipt. By construction, we
+know that for each message Tsnd(mi) < Trcv(mi). But what can we conclude
+in general from Trcv(mi) < Tsnd(mj) for different messages mi and mj?
+```
+
+![Concurrent message](../misc/distributed_systems/c6/fig6.12_ConcurrentMessageTransmissionUsingLogicalClocks.PNG)
+
+```
+In the case for which mi = m1 and mj = m3, we know that these values
+correspond to events that took place at process P2, meaning that m3 was
+indeed sent after the receipt of message m1. This may indicate that the
+sending of message m3 depended on what was received through message m1.
+At the same time, we also know that Trcv(m1) < Tsnd(m2). However, as far as
+we can tell from Figure 6.12, the sending of m2 has nothing to do with the
+receipt of m1.
+```
+
+The problem is that Lamport clocks do not capture **causality**. In practice,
+causality is captured by means of **vector clocks**.
+
+In fact, tracking causality is simple if we assign each event a unique
+name such as the combination of a process ID and a locally incrementing
+counter: pk is the kth event that happened at process P. The problem then
+boils down to keeping track of **causal histories**. For example, if two local
+events happened at process P, then the causal history H(p2) of event p2 is
+fp1, p2g.
+
+Now assume that process P sends a message to process Q (which is an
+event at P and thus recorded as pk from some k), and that at the time of arrival
+(and event for Q), the most recent causal history of Q was fq1g. To track
+causality, P also sends its most recent causal history (assume it was {p1, p2},
+extended with p3 expressing the sending of the message). Upon arrival, Q
+records the event (q2), and merges the two causal histories into a new one:
+{p1, p2, p3, q1, q2}.
+
+Checking whether an event p causally precedes an event q can be done
+by checking whether H(p) apartine H(q) (i.e., it should be a proper subset). In fact,
+with our notation, it even suffices to check whether p exista H(q), assuming that
+q is always the last local event in H(q).
+
+## Mutual exclusion
+Distributed mutual exclusion algorithms can be classified into **two different
+categories**.
+
+In **token-based solutions** mutual exclusion is achieved by passing
+a special message between the processes, known as a **token**. There is only one
+token available and who ever has that token is allowed to access the shared
+resource. When finished, the token is passed on to a next process. If a process
+having the token is not interested in accessing the resource, it passes it on.
+
+Token-based solutions have a few important properties. First, depending
+on how the processes are organized, they can fairly easily ensure that every
+process will get a chance at accessing the resource. In other words, they avoid
+**starvation**. Second, **deadlocks** by which several processes are indefinitely
+waiting for each other to proceed, can easily be avoided, contributing to their
+simplicity. The main drawback of token-based solutions is a rather serious
+one: when the token is lost (e.g., because the process holding it crashed), an
+intricate distributed procedure needs to be started to ensure that a new token
+is created, but above all, that it is also the only token.
+
+As an alternative, many distributed mutual exclusion algorithms follow
+a **permission-based approach**. In this case, a process wanting to access the
+resource first requires the permission from other processes.
+
+### A centralized algorithm
+
+A straightforward way to achieve mutual exclusion in a distributed system is
+to simulate how it is done in a one-processor system. One process is elected
+as the coordinator. Whenever a process wants to access a shared resource, it
+sends a request message to the coordinator stating which resource it wants to
+access and asking for permission. If no other process is currently accessing
+that resource, the coordinator sends back a reply granting permission, as
+shown in Figure 6.15(a). When the reply arrives, the requester can go ahead.
+Now suppose that another process, P2 in Figure 6.15(b) asks for permission
+to access the resource. The coordinator knows that a different process is
+already at the resource, so it cannot grant permission. The exact method used
+to deny permission is system dependent. In Figure 6.15(b) the coordinator just
+refrains from replying, thus blocking process P2, which is waiting for a reply.
+Alternatively, it could send a reply saying “permission denied.” Either way, it
+queues the request from P2 for the time being and waits for more messages.
+
+![Centralized algorithm](../misc/distributed_systems/c6/fig6.15.MutualExclusion_centralized.PNG)
+
+It is easy to see that the algorithm guarantees mutual exclusion: the
+coordinator lets only one process at a time access the resource. It is also fair,
+since requests are granted in the order in which they are received. No process
+ever waits forever (no starvation). The scheme is easy to implement, too, and
+requires only three messages per use of resource (request, grant, release). Its
+simplicity makes it an attractive solution for many practical situations.
+
+The centralized approach also has shortcomings. The coordinator is a
+single point of failure, so if it crashes, the entire system may go down. If
+processes normally block after making a request, they cannot distinguish a
+dead coordinator from “permission denied” since in both cases no message
+comes back. In addition, in a large system, a single coordinator can become a
+performance bottleneck. Nevertheless, the benefits coming from its simplicity
+outweigh in many cases the potential drawbacks.
+
+### A distributed algorithm
+
+The solution requires a total ordering of all events in the system. That is, for any pair of events, such
+as messages, it must be unambiguous which one actually happened first.
+
+When a process wants to access a shared resource, it builds a message containing the name of the resource, its process
+number, and the current (logical) time. It then sends the message to all other processes, conceptually including itself. The sending of messages is assumed
+to be reliable; that is, no message is lost.
+
+When a process receives a request message from another process, the
+action it takes depends on its own state with respect to the resource named in
+the message. Three different cases have to be clearly distinguished:
+
+```
+• If the receiver is not accessing the resource and does not want to access
+it, it sends back an OK message to the sender.
+• If the receiver already has access to the resource, it simply does not reply.
+Instead, it queues the request.
+• If the receiver wants to access the resource as well but has not yet done
+so, it compares the timestamp of the incoming message with the one
+contained in the message that it has sent everyone. The lowest one wins.
+If the incoming message has a lower timestamp, the receiver sends back
+an OK message. If its own message has a lower timestamp, the receiver
+queues the incoming request and sends nothing.
+```
+
+![Distributed algorithm](../misc/distributed_systems/c6/fig6.16_mutualExclusion_distributed_algorithm.PNG)
+
+With this algorithm, mutual exclusion is guaranteed without deadlock or
+starvation. If the total number of processes is N, then the number of messages
+that a process needs to send and receive before it can enter its critical section
+is 2 * (N - 1): N -1 request messages to all other processes, and subsequently
+N - 1 OK messages, one from each other process.
+
+Unfortunately, this algorithm has N points of failure. If any process
+crashes, it will fail to respond to requests. This silence will be interpreted
+(incorrectly) as denial of permission, thus blocking all subsequent attempts by
+all processes to enter any of their respective critical regions. The algorithm can
+be patched up as follows. When a request comes in, the receiver always sends
+a reply, either granting or denying permission. Whenever either a request or a
+reply is lost, the sender times out and keeps trying until either a reply comes
+back or the sender concludes that the destination is dead. After a request is
+denied, the sender should block waiting for a subsequent OK message.
+
+Another problem with this algorithm is that either a multicast communication
+primitive must be used, or each process must maintain the group
+membership list itself, including processes entering the group, leaving the
+group, and crashing. The method works best with small groups of processes
+that never change their group memberships. Finally, note that all processes are
+involved in all decisions concerning accessing the shared resource, which may
+impose a burden on processes running on resource-constrained machines.
+
+### A token-ring algorithm
+
+In software, we construct an overlay network in the form of a logical ring in which each
+process is assigned a position in the ring. All that matters is that each process
+knows who is next in line after itself.
+
+When the ring is initialized, process P0 is given a **token**. The token
+circulates around the ring. Assuming there are N processes, the token is
+passed from process Pk to process P(k+1) mod N in point-to-point messages.
+
+![Token ring algorithm](../misc/distributed_systems/c6/fig6.17_token_ring_algorithm.PNG)
+
+When a process acquires the token from its neighbor, it checks to see if it
+needs to access the shared resource. If so, the process goes ahead, does all the
+work it needs to, and releases the resources. After it has finished, it passes
+the token along the ring. It is not permitted to immediately enter the resource
+again using the same token.
+
+If a process is handed the token by its neighbor and is not interested in the
+resource, it just passes the token along. As a consequence, when no processes
+need the resource, the token just circulates around the ring.
+
+This algorithm has its own problems. If the token is ever lost, for example,
+because its holder crashes or due to a lost message containing the token, it
+must be regenerated. In fact, detecting that it is lost may be difficult, since the
+amount of time between successive appearances of the token on the network
+is unbounded. The fact that the token has not been spotted for an hour does
+not mean that it has been lost; somebody may still be using it.
+
+The algorithm also runs into trouble if a process crashes, but recovery is
+relatively easy. If we require a process receiving the token to acknowledge
+receipt, a dead process will be detected when its neighbor tries to give it the
+token and fails. At that point the dead process can be removed from the group,
+and the token holder can throw the token over the head of the dead process to
+the next member down the line, or the one after that, if necessary. Of course,
+doing so requires that everyone maintains the current ring configuration.
+
+## A decentralized algorithm
+Use a voting algorithm. Each resource is assumed to be replicated N times. Every replica has its own coordinator for controlling the access by concurrent
+processes.
+
+However, whenever a process wants to access the resource, it will simply need to get a majority vote from m > N/2 coordinators. We assume that
+when a coordinator does not give permission to access a resource (which it will do when it had granted permission to another process), it will tell the
+requester.
+
+The assumption is that when a coordinator crashes, it recovers quickly
+but will have forgotten any vote it gave before it crashed. Another way of
+viewing this is that a coordinator resets itself at arbitrary moments. The risk
+that we are taking is that a reset will make the coordinator forget that it had
+previously granted permission to some process to access the resource. As a
+consequence, it may incorrectly grant this permission again to another process
+after its recovery.
+
+### Election algorithms
+Many distributed algorithms require one process to act as coordinator, initiator, or otherwise perform some special role. In general, it does not matter which
+process takes on this special responsibility, but one of them has to do it.
+
+If all processes are exactly the same, with no distinguishing characteristics, there is no way to select one of them to be special. Consequently, we will
+assume that each process P has a unique identifier id(P). In general, election algorithms attempt to locate the process with the highest identifier and
+designate it as coordinator. The algorithms differ in the way they locate the coordinator.
+
+Furthermore, we also assume that every process knows the identifier of every other process. In other words, each process has complete knowledge of
+the process group in which a coordinator must be elected. What the processes do not know is which ones are currently up and which ones are currently
+down. The goal of an election algorithm is to ensure that when an election starts, it concludes with all processes agreeing on who the new coordinator is
+to be.
+
+#### The bully algorithm
+```
+In the following, we consider N processes {P0, . . . , PN-1} and let id(Pk) = k. When any process notices that the coordinator
+is no longer responding to requests, it initiates an election. A process, Pk, holds an election as follows:
+1. Pk sends an ELECTION message to all processes with higher identifiers:Pk+1, Pk+2, . . . , PN-1.
+2. If no one responds, Pk wins the election and becomes coordinator.
+3. If one of the higher-ups answers, it takes over and Pk’s job is done.
+```
+
+At any moment, a process can get an ELECTION message from one of its
+lower-numbered colleagues. When such a message arrives, the receiver sends
+an OK message back to the sender to indicate that he is alive and will take
+over. The receiver then holds an election, unless it is already holding one.
+Eventually, all processes give up but one, and that one is the new coordinator.
+It announces its victory by sending all processes a message telling them that
+starting immediately it is the new coordinator.
+
+If a process that was previously down comes back up, it holds an election. If it happens to be the highest-numbered process currently running, it will
+win the election and take over the coordinator’s job. Thus the biggest guy in town always wins, hence the name “bully algorithm.”
+
+![Bully algorithm](../misc/distributed_systems/c6/fig6.20_bully_algorithm.PNG)
+
+#### A ring algorithm
+Consider the following election algorithm that is based on the use of a (logical)
+ring. Unlike some ring algorithms, this one does not use a token. We assume
+that each process knows who its successor is. When any process notices that
+the coordinator is not functioning, it builds an ELECTION message containing
+its own process identifier and sends the message to its successor. If the
+successor is down, the sender skips over the successor and goes to the next
+member along the ring, or the one after that, until a running process is located.
+At each step along the way, the sender adds its own identifier to the list in the
+message effectively making itself a candidate to be elected as coordinator.
+
+Eventually, the message gets back to the process that started it all. That process
+recognizes this event when it receives an incoming message containing its
+own identifier. At that point, the message type is changed to COORDINATOR
+and circulated once again, this time to inform everyone else who the coordinator
+is (the list member with the highest identifier) and who the members of
+the new ring are. When this message has circulated once, it is removed and
+everyone goes back to work.
+
+![Election Using Ring](../misc/distributed_systems/c6/fig6.21_Election_using_a_ring.PNG)
+
+## Distributed event matching
+Event matching, or more precisely, notification
+filtering, is at the heart of publish-subscribe systems. The problem boils down
+to the following:
+
+```
+• A process specifies through a subscription S in which events it is interested.
+• When a process publishes a notification N on the occurrence of an event,
+the system needs to see if S matches N.
+• In the case of a match, the system should send the notification N, possibly
+including the data associated with the event that took place, to the subscriber.
+```
+
+As a consequence, we need to facilitate at least two things: (1) matching
+subscriptions against events, and (2) notifying a subscriber in the case of a
+match.
+
+### Centralized implementations
+A simple, naive implementation of event matching is to have a fully centralized
+server that handles all subscriptions and notifications. In such a scheme, a
+subscriber simply submits a subscription, which is subsequently stored. When
+a publisher submits a notification, that notification is checked against each
+and every subscription, and when a match is found, the notification is copied
+and forwarded to the associated subscriber.
+
+The idea of having a central server can be extended by distributing the
+matching across multiple servers and dividing the work. The servers, generally
+referred to as brokers, are organized into an overlay network. The issue
+then becomes how to route notifications to the appropriate set of subscribers.
+Following Baldoni et al. [2009], we distinguish three different classes: (1) **flooding**,
+(2) **selective routing**, and (3) **gossip-based dissemination**. An extensive
+survey on combining peer-to-peer networks and publish-subscribe systems is
+provided by Kermarrec and Triantafillou [2013].
+
+When systems become big, flooding is not the best way to go, if even
+possible. Instead, routing notifications across the overlay network of brokers
+may be necessary. This is typically the way to go in information-centric
+networking, which makes use of name-based routing [Ahlgren et al., 2012;
+Xylomenos et al., 2014]. Name-based routing is a special case of selective
+notification routing.
+
+![Naive content-based routing](../misc/distributed_systems/c6/fig6.27_naive_content_based_routing.PNG)
+
+## Gossip-based coordination
+
+### Aggregation
+We already mentioned spreading updates, which is perhaps the most widelydeployed
+application. In the same light, gossiping can be used to discover
+nodes that have a few outgoing wide-area links, to subsequently apply directional
+gossiping.
+
+# Consistency and replication
+Data are generally replicated to enhance reliability or improve performance.
+
+Consistency is only half of the story. We also need to consider how
+consistency is actually implemented. There are essentially two, more or
+less independent, issues we need to consider. First of all, we start with
+concentrating on managing replicas, which takes into account not only the
+placement of replica servers, but also how content is distributed to these
+servers.
+
+The second issue is how replicas are kept consistent.
+
+## Introduction
+
+There are two primary reasons for replicating data. First, data are replicated
+to increase the reliability of a system.
+
+The other reason for replicating data is performance.
+
+In many cases, the only real solution is to relax the consistency constraints.
+In other words, if we can relax the requirement that updates need to be
+executed as atomic operations, we may be able to avoid (instantaneous) global
+synchronizations, and may thus gain performance. The price paid is that
+copies may not always be the same everywhere. As it turns out, to what
+extent consistency can be relaxed depends highly on the access and update
+patterns of the replicated data, as well as on the purpose for which those data
+are used.
+
+## Data-centric consistency models
+Traditionally, consistency has been discussed in the context of read and write operations on shared data, available by means of (distributed) shared memory,
+a (distributed) shared database, or a (distributed) file system. Here, we use the broader term **data store**.
+
+![Logical Data Store](../misc/distributed_systems/c7/fig7.1_logical_data_store.PNG)
+
+A **consistency model** is essentially a contract between processes and the
+data store. It says that if processes agree to obey certain rules, the store
+promises to work correctly. Normally, a process that performs a read operation
+on a data item, expects the operation to return a value that shows the results
+of the last write operation on that data.
+
+In the absence of a global clock, it is difficult to define precisely which
+write operation is the last one. As an alternative, we need to provide other
+definitions, leading to a range of consistency models.
+
+### Continuous consistency
+There is no such thing as a best solution to replicating data. Replicating data
+poses consistency problems that cannot be solved efficiently in a general way.
+Only if we loosen consistency can there be hope for attaining efficient solutions.
+Unfortunately, there are also no general rules for loosening consistency: exactly
+what can be tolerated is highly **dependent on applications**.
+
+There are different ways for **applications** to specify what inconsistencies
+they can tolerate.
+
+Distinguishing three independent axes for defining inconsistencies:
+* deviation in numerical values between replicas
+* deviation in staleness between replicas
+* deviation with respect to the ordering of update operations
+
+These deviations as forming **continuous consistency** ranges.
+
+Measuring inconsistency in terms of numerical deviations can be used
+by applications for which the data have numerical semantics. One obvious
+example is the replication of records containing stock market prices. In this
+case, an application may specify that two copies should not deviate more than
+$0.02, which would be an **absolute numerical deviation**. Alternatively, a **relative
+numerical deviation** could be specified, stating that two copies should differ by
+no more than, for example, 0.5%.
+
+Staleness deviations relate to the last time a replica was updated. For some
+applications, it can be tolerated that a replica provides old data as long as it is
+not too old. For example, weather reports typically stay reasonably accurate
+over some time, say a few hours.
+
+Finally, there are classes of applications in which the ordering of updates
+are allowed to be different at the various replicas, as long as the differences
+remain bounded. One way of looking at these updates is that they are applied
+tentatively to a local copy, awaiting global agreement from all replicas. As
+a consequence, some updates may need to be rolled back and applied in a
+different order before becoming permanent. Intuitively, ordering deviations
+are much harder to grasp than the other two consistency metrics.
+
+#### The notion of a conit
+To define inconsistencies, Yu and Vahdat introduce a **consistency unit**, abbreviated
+to **conit**. A conit specifies the unit over which consistency is to
+be measured. For example, in our stock-exchange example, a conit could
+be defined as a record representing a single stock. Another example is an
+individual weather report.
+
+### Consistent ordering of operations

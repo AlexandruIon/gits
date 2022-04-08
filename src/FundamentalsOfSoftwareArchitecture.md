@@ -15,7 +15,7 @@
 * [Chapter 14. Event-Driven Architecture Style](#Chapter-14.-Event-Driven-Architecture-Style)
 * [Chapter 15. Space-Based Architecture Style](#Chapter-15.-Space-Based-Architecture-Style)
 * [Chapter 16. Orchestration-Driven Service-Oriented Architecture](#Chapter-16.-Orchestration-Driven-Service-Oriented-Architecture)
-* [Chapter 17. Microservices Architecture](#Chapter-17.-Microservices-Architecture)![img.png](img.png)
+* [Chapter 17. Microservices Architecture](#Chapter-17.-Microservices-Architecture)![img.png](../misc/sqlfordataanalysis/img.png)
 * [Setup](#setup)
 
 # Chapter 1. Introduction
