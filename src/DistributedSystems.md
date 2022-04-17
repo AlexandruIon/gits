@@ -2155,7 +2155,19 @@ nodes that have a few outgoing wide-area links, to subsequently apply directiona
 gossiping.
 
 # Consistency and replication
-Data are generally replicated to enhance reliability or improve performance.
+Data are generally replicated to **enhance reliability** or **improve performance**.
+
+An important class of what are known as consistency
+models assumes that multiple processes **simultaneously access shared data**.
+Consistency for these situations can be formulated with respect to what processes
+can expect when reading and updating the shared data, knowing that
+others are accessing that data as well.
+
+**Consistency models for shared data** are often hard to implement efficiently
+in large-scale distributed systems. Moreover, in many cases simpler models
+can be used, which are also often easier to implement. One specific class is
+formed by **client-centric consistency models**, which concentrate on consistency
+from the perspective of a single (possibly mobile) client.
 
 Consistency is only half of the story. We also need to consider how
 consistency is actually implemented. There are essentially two, more or
@@ -2183,7 +2195,7 @@ patterns of the replicated data, as well as on the purpose for which those data
 are used.
 
 ## Data-centric consistency models
-Traditionally, consistency has been discussed in the context of read and write operations on shared data, available by means of (distributed) shared memory,
+Traditionally, consistency has been discussed in the context of read and write operations on **shared data**, available by means of (distributed) shared memory,
 a (distributed) shared database, or a (distributed) file system. Here, we use the broader term **data store**.
 
 ![Logical Data Store](../misc/distributed_systems/c7/fig7.1_logical_data_store.PNG)
@@ -2192,7 +2204,7 @@ A **consistency model** is essentially a contract between processes and the
 data store. It says that if processes agree to obey certain rules, the store
 promises to work correctly. Normally, a process that performs a read operation
 on a data item, expects the operation to return a value that shows the results
-of the last write operation on that data.
+of the **last write operation** on that data.
 
 In the absence of a global clock, it is difficult to define precisely which
 write operation is the last one. As an alternative, we need to provide other
@@ -2244,3 +2256,683 @@ be defined as a record representing a single stock. Another example is an
 individual weather report.
 
 ### Consistent ordering of operations
+There is a huge body of work on data-centric consistency models from the
+past decades. An important class of models comes from the field of parallel
+programming. Confronted with the fact that in parallel and distributed
+computing multiple processes will need to share resources and access these
+resources simultaneously, researchers have sought to express the semantics
+of concurrent accesses when shared resources are replicated. The models
+that we discuss here all deal with **consistently ordering operations on shared,
+replicated data.**
+
+In principle, the models augment those of continuous consistency in the
+sense that when tentative updates at replicas need to be committed, replicas
+will need to reach agreement on a global, that is, consistent ordering of those
+updates.
+
+
+#### Sequential consistency
+Sequential consistency is an important data-centric consistency model,
+which was first defined by Lamport [1979] in the context of shared memory
+for multiprocessor systems. A data store is said to be sequentially consistent
+when it satisfies the following condition:
+
+```
+The result of any execution is the same as if the (read and write) operations
+by all processes on the data store were executed in some sequential
+order and the operations of each individual process appear in this sequence
+in the order specified by its program.
+```
+
+What this definition means is that when processes run **concurrently** on
+(possibly) different machines, any valid interleaving of read and write operations
+is acceptable behavior, but **all processes see the same interleaving of
+operations**. Note that nothing is said about time; that is, there is no reference
+to the “most recent” write operation on a data item. Also, a process “sees”
+the writes from all processes but only through its own reads.
+
+![Sequentiallu consistent](../misc/distributed_systems/c7/fig7.5_sequenctially_consistent.PNG)
+
+#### Causal consistency
+
+The causal consistency model [Hutto and Ahamad, 1990] represents a weakening
+of sequential consistency in that it makes a distinction between events
+that are potentially causally related and those that are not. We already came
+across causality when discussing vector timestamps in the previous chapter.
+If event b is caused or influenced by an earlier event a, causality requires that
+everyone else first see a, then see b.
+
+Operations that are not causally related are said to be concurrent.
+
+For a data store to be considered causally consistent, it is necessary that
+the store obeys the following condition:
+
+```
+Writes that are potentially causally related must be seen by all processes
+in the same order. Concurrent writes may be seen in a different order on
+different machines.
+```
+
+The thing to note is that the writes W2(x)b and W1(x)c are concurrent, so it is
+not required that all processes see them in the same order.
+
+![Causally consistent store](../misc/distributed_systems/c7/fig7.10_causally_consistent_store.PNG)
+
+#### Grouping operations
+The fine granularity of these consistency models in many cases does not
+match the granularity as provided by applications. What we see there is that
+concurrency between programs sharing data is generally kept under control
+through synchronization mechanisms for mutual exclusion and transactions.
+
+Effectively, what happens is that at the program level read and write operations
+are bracketed by the pair of operations ENTER_CS and LEAVE_CS.
+
+Put differently, the bracketing turns the
+series of read and write operations into an atomically executed unit, thus
+raising the level of granularity.
+
+In order to reach this point, we do need to have precise semantics concerning
+the operations ENTER_CS and LEAVE_CS. These semantics can be formulated
+in terms of shared **synchronization variables**, or simply **locks**.
+
+is known as **entry consistency**.
+
+##### Consistency versus coherence
+At this point, it is useful to clarify the difference between two closely related
+concepts. The models we have discussed so far all deal with the fact that a
+number of processes execute read and write operations on a set of data items.
+A consistency model describes what can be expected with respect to that set
+when multiple processes concurrently operate on that data. The set is then
+said to be consistent if it adheres to the rules described by the model.
+Where data consistency is concerned with a set of data items, coherence
+models describe what can be expected to hold for only a single data
+item
+
+#### Eventual consistency
+To what extent processes actually operate in a concurrent fashion, and to
+what extent consistency needs to be guaranteed, may vary. There are many
+examples in which **concurrency appears only in a restricted form**.
+
+For example, in many database systems, most processes hardly ever perform update
+operations; they mostly read data from the database. Only one, or very few
+processes perform update operations. The question then is how fast updates
+should be made available to only-reading processes.
+
+Another example is the Web. In virtually all cases, Web pages are updated
+by a single authority, such as a webmaster or the actual owner of the page.
+There are normally no write-write conflicts to resolve.
+
+Yet another example, is a worldwide naming system such as DNS.
+The only situation that needs to be handled are **read-write** conflicts, in which one process wants to update a data
+item while another is concurrently attempting to read that item.
+
+These examples can be viewed as cases of (large scale) distributed and
+replicated databases that tolerate a relatively high degree of inconsistency.
+They have in common that if no updates take place for a long time, all replicas
+will gradually become consistent, that is, have exactly the same data stored.
+This form of consistency is called **eventual consistency**. 
+
+Data stores that are eventually consistent thus have the property that in
+the absence of write-write conflicts, all replicas will converge toward identical
+copies of each other. Eventual consistency essentially requires only that
+updates are guaranteed to propagate to all replicas. Write-write conflicts
+are often relatively easy to solve when assuming that only a small group of
+processes can perform updates. In practice, we often also see that in the case
+of conflicts, one specific write operation is (globally) declared as “winner,”
+overwriting the effects of any other conflicting write operation. Eventual
+consistency is therefore often cheap to implement.
+
+## Client-centric consistency models
+**Data-centric consistency models aim at providing a systemwide consistent
+view on a data store**. An important assumption is that concurrent processes
+may be simultaneously updating the data store, and that it is necessary to
+provide consistency in the face of such concurrency.
+
+For example, in the case
+of object-based entry consistency, the data store guarantees that when an
+object is called, the calling process is provided with a copy of the object that
+reflects all changes to the object that have been made so far, possibly by other
+processes. During the call, it is also guaranteed that no other process can
+interfere, that is, mutual exclusive access is provided to the calling process.
+
+Being able to handle concurrent operations on shared data while maintaining
+strong consistency is fundamental to distributed systems. For performance
+reasons, **strong consistency** may possibly be guaranteed only when processes
+use mechanisms such as **transactions** or **synchronization variables**. Along the
+same lines, it may be impossible to guarantee strong consistency, and weaker
+forms need to be accepted, such as causal consistency in combination with
+eventual consistency.
+
+In this section, we take a look at a special class of distributed data stores.
+The **data stores we consider are characterized by the lack of simultaneous
+updates**, or when such updates happen, it is assumed that they can be
+relatively easily resolved. **Most operations involve reading data**. These data
+stores **offer a weak consistency model, such as eventual consistency**. By
+introducing special client-centric consistency models, it turns out that many
+inconsistencies can be hidden in a relatively cheap way.
+
+**Eventually consistent data stores** generally work fine as long as clients
+always access the same replica. However, problems arise when different
+replicas are accessed over a short period of time.
+
+This example is typical for eventually consistent data stores and is caused
+by the fact that users may sometimes operate on different replicas while
+updates have not been fully propagated. The problem can be alleviated by
+introducing **client-centric consistency**. In essence, client-centric consistency
+provides guarantees for **a single client** concerning the consistency of accesses
+to a data store by that client. **No guarantees are given concerning concurrent
+accesses by different clients**.
+
+Client-centric consistency models are described using the following notations.
+Let xi denote the version of data item x. Version xi is the result of a series
+of write operations that took place since initialization, its write set WS(xi). By
+appending write operations to that series we obtain another version xj and say
+that xj follows from xi. We use the notation WS(xi; xj) to indicate that xj follows
+from xi. If we do not know if xj follows from xi, we use the notation WS(xijxj).
+
+### Monotonic reads
+A (distributed) data store is said to provide monotonic-read consistency if the following condition holds:
+
+```
+If a process reads the value of a data item x, any successive read operation
+on x by that process will always return that same value or a more recent
+value.
+```
+
+In other words, monotonic-read consistency guarantees that once a process
+has seen a value of x, it will never see an older version of x.
+
+![Monotonic reads](../misc/distributed_systems/c7/fig7.16_monotonic_reads.PNG)
+
+### Monotonic writes
+In many situations, it is important that write operations are propagated in
+the correct order to all copies of the data store. This property is expressed
+in monotonic-write consistency. In a **monotonic-write consistent store**, the
+following condition holds:
+```
+A write operation by a process on a data item x is completed before any
+successive write operation on x by the same process.
+```
+More formally, if we have two successive operations Wk(xi) and Wk(xj) by
+process Pk, then, regardless where Wk(xj) takes place, we also have WS(xi; xj).
+Thus, completing a write operation means that the copy on which a successive
+operation is performed reflects the effect of a previous write operation by the
+same process, no matter where that operation was initiated. In other words, **a
+write operation on a copy of item x is performed only if that copy has been
+brought up to date by means of any preceding write operation by that same
+process, which may have taken place on other copies of x.** If need be, the new
+write must wait for old ones to finish.
+
+Note that monotonic-write consistency resembles data-centric FIFO consistency.
+**The essence of FIFO consistency is that write operations by the same
+process are performed in the correct order everywhere.** This ordering constraint
+also applies to monotonic writes, except that we are now considering
+consistency only for a single process instead of for a collection of concurrent
+processes.
+
+![Monotonic writes](../misc/distributed_systems/c7/fig7.17_monotonic_writes.PNG)
+
+Monotonic-write consistency is shown in Figure 7.17. In Figure 7.17(a)
+process P1 performs a write operation on x at L1, presented as the operation
+W1(x1). Later, P1 performs another write operation on x, but this time at
+L2, shown as W1(x2; x3). The version produced by P1 at L2 follows from an
+update by process P2, in turn based on version x1. The latter is expressed
+by the operation W2(x1; x2). To ensure monotonic-write consistency, it is
+necessary that the previous write operation at L1 has already been propagated
+to L2, and possibly updated.
+
+In contrast, Figure 7.17(b) shows a situation in which monotonic-write
+consistency is not guaranteed. Compared to Figure 7.17(a) what is missing is
+the propagation of x1 to L2 before another version of x is produced, expressed
+by the operation W2(x1jx2). In this case, process P2 produced a concurrent
+version to x1, after which process P1 simply produces version x3, but again
+concurrently to x1.
+
+Note that, by the definition of monotonic-write consistency, write operations
+by the same process are performed in the same order as they are initiated.
+
+### Read your writes
+```
+The effect of a write operation by a process on data item x will always be
+seen by a successive read operation on x by the same process.
+```
+In other words, a write operation is always completed before a successive read
+operation by the same process, n**o matter where that read operation takes
+place**.
+
+![Read your writes](../misc/distributed_systems/c7/fig7.18_read_your_writes.PNG)
+
+In Figure 7.18(a) process P1 performed a write operation W1(x1) and
+later a read operation at a different local copy. Read-your-writes consistency
+guarantees that the effects of the write operation can be seen by the succeeding
+read operation. This is expressed by W2(x1; x2), which states that a process P2
+produced a new version of x, yet one based on x1. In contrast, in Figure 7.18(b)
+process P2 produces a version concurrently to x1, expressed as W2(x1jx2).
+
+This means that the effects of the previous write operation by process P1 have
+not been propagated to L2 at the time x2 was produced. When P1 reads x2, it
+will not see the effects of its own write operation at L1.
+
+### Writes follow reads
+updates are propagated as the result of previous read operations.
+```
+A write operation by a process on a data item x following a previous read
+operation on x by the same process is guaranteed to take place on the
+same or a more recent value of x that was read.
+```
+
+In other words, any successive write operation by a process on a data item
+x will be performed on a copy of x that is up to date with the value most
+recently read by that process.
+
+![Writes follow reads](../misc/distributed_systems/c7/fig7.19_writes_follow_reads.PNG)
+
+## Replica management
+A key issue for any distributed system that supports replication is to decide
+where, when, and by whom replicas should be placed, and subsequently
+which mechanisms to use for keeping the replicas consistent. The placement
+problem itself should be split into two subproblems: that of placing **replica
+servers**, and that of placing **content**. The difference is a subtle one and the two
+issues are often not clearly separated. Replica-server placement is concerned
+with finding the best locations to place a server that can host (part of) a
+data store. Content placement deals with finding the best servers for placing
+content. Note that this often means that we are looking for the optimal
+placement of only a single data item. Obviously, before content placement can
+take place, replica servers will have to be placed first.
+
+### Finding the best server location
+
+### Content replication and placement
+When it comes to content replication and placement, three different types of
+replicas can be distinguished logically organized as shown in Figure 7.21.
+
+![Replicas Logical Organization](../misc/distributed_systems/c7/fig7.21_replicas_logical_organization.PNG)
+
+#### Permanent replicas
+Permanent replicas can be considered as the initial set of replicas that constitute a distributed data store. In many cases, the number of permanent
+replicas is small.
+
+Consider, for example, a Web site. Distribution of a Web site
+generally comes in one of two forms. The first kind of distribution is one in
+which the files that constitute a site are replicated across a limited number of
+servers at a single location. Whenever a request comes in, it is forwarded to
+one of the servers, for instance, using a round-robin strategy.
+
+The second form of distributed Web sites is what is called **mirroring**. In
+this case, a Web site is copied to a limited number of servers, called **mirror
+sites**, which are geographically spread across the Internet. In most cases,
+clients simply choose one of the various mirror sites from a list offered to
+them. Mirrored Web sites have in common with cluster-based Web sites that
+there are only a few replicas, which are more or less statically configured.
+
+Similar static organizations also appear with distributed databases.
+Again, the database can be distributed and replicated across a number of servers that together form a cluster of
+servers, often referred to as a **shared-nothing architecture**, emphasizing that
+neither disks nor main memory are shared by processors.
+
+#### Server-initiated replicas
+
+In contrast to permanent replicas, server-initiated replicas are copies of a data
+store that exist to enhance performance, and created at the initiative of the
+(owner of the) data store. Consider, for example, a Web server placed in
+New York. Normally, this server can handle incoming requests quite easily,
+but it may happen that over a couple of days a sudden burst of requests
+come in from an unexpected location far from the server. In that case, it may
+be worthwhile to install a number of temporary replicas in regions where
+requests are coming from.
+
+Note that as long as guarantees can be given that each data item is hosted
+by at least one server, it may suffice to use only server-initiated replication
+and not have any permanent replicas. However, permanent replicas are often
+useful as a back-up facility, or to be used as the only replicas that are allowed
+to be changed to guarantee consistency. Server-initiated replicas are then used
+for placing read-only copies close to clients.
+
+#### Client-initiated replicas
+Client-initiated replicas are more commonly known as **(client) caches**. In essence, a cache is a
+local storage facility that is used by a client to temporarily store a copy of the data it has just requested. In principle, managing the cache is left entirely to
+the client.
+
+Client caches are used only to improve access times to data.
+
+Data are generally kept in a cache for a limited amount of time, for example,
+to prevent extremely stale data from being used, or simply to make room
+for other data. Whenever requested data can be fetched from the local cache,
+a cache hit is said to have occurred.
+
+Placement of client caches is relatively simple: a cache is normally placed
+on the same machine as its client, or otherwise on a machine shared by clients
+on the same local-area network.
+
+Yet another approach is to place (cache) servers at specific points in a
+wide-area network and let a client locate the nearest server.
+
+### Content distribution
+Replica management also deals with propagation of (updated) content to the relevant replica servers. There are various trade-offs to make.
+
+#### State versus operations
+An important design issue concerns what is actually to be propagated.
+
+* Propagate only a notification of an update. (read-to-write ratio small)
+* Transfer data from one copy to another. (read-to-write ratio high)
+* Propagate the update operation to other copies.
+
+**Propagating a notification** is what **invalidation protocols** do.
+In an invalidation protocol, other copies are informed that an update has taken place
+and that the data they contain are no longer valid. The invalidation may
+specify which part of the data store has been updated, so that only part of
+a copy is actually invalidated. The important issue is that no more than a
+notification is propagated. Whenever an operation on an invalidated copy is
+requested, that copy generally needs to be updated first, depending on the
+specific consistency model that is to be supported.
+
+The main advantage of invalidation protocols is that they use little network
+bandwidth. The only information that needs to be transferred is a specification
+of which data are no longer valid. Such protocols generally work best when
+there are many update operations compared to read operations, that is, the
+read-to-write ratio is relatively small.
+
+**Transferring the modified data** among replicas is the second alternative,
+and is useful when the read-to-write ratio is relatively high. In that case, the
+probability that an update will be effective in the sense that the modified data
+will be read before the next update takes place is high. Instead of propagating
+modified data, it is also possible to log the changes and transfer only those
+logs to save bandwidth. In addition, transfers are often aggregated in the
+sense that multiple modifications are packed into a single message, thus
+saving communication overhead.
+
+The third approach is not to transfer any data modifications at all, but
+to **tell each replica which update operation it should perform** (and sending
+only the parameter values that those operations need). This approach, also
+referred to as **active replication**, assumes that each replica is represented
+by a process capable of “actively” keeping its associated data up to date by
+performing operations. The main benefit of active replication is that updates can often be propagated at minimal bandwidth costs, provided
+the size of the parameters associated with an operation are relatively small.
+Moreover, the operations can be of arbitrary complexity, which may allow
+further improvements in keeping replicas consistent. On the other hand, more
+processing power may be required by each replica, especially in those cases
+when operations are relatively complex.
+
+#### Pull versus push protocols
+In a **push-based approach**, also referred to as **server-based protocols**, updates are propagated
+to other replicas without those replicas even asking for the updates.
+Push-based approaches are often used between permanent and server-initiated
+replicas, but can also be used to push updates to client caches. **Server-based
+protocols are generally applied when strong consistency is required**.
+
+This need for strong consistency is related to the fact that permanent and
+server-initiated replicas, as well as large shared caches, are often shared by
+many clients, which, in turn, mainly perform read operations. Consequently,
+the read-to-update ratio at each replica is relatively high. In these cases, pushbased
+protocols are efficient in the sense that every pushed update can be
+expected to be of use for at least one, but perhaps more readers. In addition,
+push-based protocols make consistent data immediately available when asked
+for.
+
+In contrast, in a **pull-based approach**, a server or client requests another
+server to send it any updates it has at that moment. Pull-based protocols, also
+called **client-based protocols**, are often used by client caches. For example, a
+common strategy applied to Web caches is first to check whether cached data
+items are still up to date.
+
+A **pull-based approach is efficient when the read-to-update ratio is relatively
+low**. This is often the case with (nonshared) client caches, which have
+only one client. However, even when a cache is shared by many clients, a
+pull-based approach may also prove to be efficient when the cached data items
+are rarely shared. The main drawback of a pull-based strategy in comparison
+to a push-based approach is that the response time increases in the case of a
+cache miss.
+
+![Push vs Pull based replication](../misc/distributed_systems/c7/fig7.23_push_vs_pull_protocols.PNG)
+
+An important issue is that in push-based protocols, the server needs to
+keep track of all client caches. Apart from the fact that stateful servers are
+often less fault tolerant, keeping track of all client caches may introduce a
+considerable overhead at the server. For example, in a push-based approach, a
+Web server may easily need to keep track of tens of thousands of client caches.
+Each time a Web page is updated, the server will need to go through its list
+of client caches holding a copy of that page, and subsequently propagate the
+update. Worse yet, if a client purges a page due to lack of space, it has to
+inform the server, leading to even more communication.
+
+These trade-offs have lead to a hybrid form of update propagation based
+on **leases**. In the case of replica management, a lease is a promise by the
+server that it will push updates to the client for a specified time. When a
+lease expires, the client is forced to poll the server for updates and pull in the
+modified data if necessary. An alternative is that a client requests a new lease
+for pushing updates when the previous lease expires.
+
+#### Unicasting versus multicasting
+Related to pushing or pulling updates is deciding whether unicasting or
+multicasting should be used. In unicast communication, when a server that is
+part of the data store sends its update to N other servers, it does so by sending
+N separate messages, one to each server. With multicasting, the underlying
+network takes care of sending a message efficiently to multiple receivers.
+
+### Managing replicated objects
+As we mentioned, data-centric consistency for distributed objects comes
+naturally in the form of entry consistency. Recall that in this case, the goal
+is to group operations on shared data using synchronization variables (e.g.,
+in the form of locks). As objects naturally combine data and the operations
+on that data, locking objects during an invocation serializes access and keeps
+them consistent.
+
+Although conceptually associating a lock with an object is simple, it does
+not necessarily provide a proper solution when an object is replicated. There
+are two issues that need to be solved for implementing entry consistency. The
+first one is that we need a means to prevent concurrent execution of multiple
+invocations on the same object. In other words, when any method of an
+object is being executed, no other methods may be executed. This requirement
+ensures that access to the internal data of an object is indeed serialized. Simply
+using local locking mechanisms will ensure this serialization.
+
+The second issue is that in the case of a replicated object, we need to ensure
+that all changes to the replicated state of the object are the same. In other
+words, we need to make sure that no two independent method invocations
+take place on different replicas at the same time. This requirement implies
+that we need to order invocations such that each replica sees all invocations
+in the same order.
+
+## Consistency protocols
+A **consistency protocol** describes an implementation of a specific consistency model.
+
+### Continuous consistency
+a number of protocols to tackle the three forms of consistency
+
+#### Bounding numerical deviation
+#### Bounding staleness deviations
+real-time vector clock
+#### Bounding ordering deviations
+
+### Primary-based protocols
+In practice, we see that distributed applications generally follow consistency
+models that are relatively easy to understand. These models include those for
+bounding staleness deviations, and to a lesser extent also those for bounding
+numerical deviations. When it comes to models that handle consistent ordering
+of operations, sequential consistency, notably those in which operations
+can be grouped through locking or transactions are popular.
+
+In the case of sequential consistency, it turns out that **primary-based
+protocols** prevail. In these protocols, each data item x in the data store has
+an associated primary, which is responsible for coordinating write operations
+on x. A distinction can be made as to whether the primary is fixed at a
+remote server or if write operations can be carried out locally after moving
+the primary to the process where the write operation is initiated.
+
+#### Remote-write protocols
+The simplest primary-based protocol that supports replication is the one in
+which all write operations need to be forwarded to a fixed single server.
+Read operations can be carried out locally. Such schemes are also known
+as **primary-backup protocols**.
+
+A primary-backup
+protocol works as shown in Figure 7.27. A process wanting to perform a write
+operation on data item x, forwards that operation to the primary server for
+x. The primary performs the update on its local copy of x, and subsequently
+forwards the update to the backup servers. Each backup server performs
+the update as well, and sends an acknowledgment to the primary. When all
+backups have updated their local copy, the primary sends
+
+![Primary-backup Protocol](../misc/distributed_systems/c7/fig7.27_primary_backup_protocol.PNG)
+
+Primary-backup protocols provide a straightforward implementation of
+sequential consistency, as the primary can order all incoming writes in a
+globally unique time order. Evidently, all processes see all write operations
+in the same order, no matter which backup server they use to perform read
+operations. Also, with blocking protocols, processes will always see the effects
+of their most recent write operation (note that this cannot be guaranteed with
+a nonblocking protocol without taking special measures).
+
+#### Local-write protocols
+A variant of primary-backup protocols is one in which the primary copy
+migrates between processes that wish to perform a write operation. As before,
+whenever a process wants to update data item x, it locates the primary copy of
+x, and subsequently moves it to its own location.
+
+The main advantage of this approach is that multiple, successive write operations
+can be carried out locally, while reading processes can still access their local
+copy. However, such an improvement can be achieved only if a nonblocking
+protocol is followed by which updates are propagated to the replicas after the
+primary has finished with locally performing the updates.
+
+![Primary-backup local Protocol](../misc/distributed_systems/c7/fig7.28_primary_backup_primary_migrates.PNG)
+
+### Replicated-write protocols
+In replicated-write protocols, write operations can be carried out at multiple
+replicas instead of only one, as in the case of primary-based replicas. A
+distinction can be made between **active replication**, in which an operation is
+forwarded to all replicas, and consistency protocols based on **majority voting**.
+
+#### Active replication
+In active replication, each replica has an associated process that carries out
+update operations. In contrast to other protocols, updates are generally
+propagated by means of the write operation that causes the update. In other
+words, the operation is sent to each replica. However, it is also possible to
+send the update.
+
+One problem with active replication is that operations need to be carried
+out in the same order everywhere. Consequently, what is needed is a **total ordered
+multicast mechanism**. A practical approach to accomplish total
+ordering is by means of a **central coordinator**, also called a **sequencer**. One
+approach is to first forward each operation to the sequencer, which assigns it
+a unique sequence number and subsequently forwards the operation to all
+replicas. Operations are carried out in the order of their sequence number.
+
+#### Quorum-based protocols
+A different approach to supporting replicated writes is to use **voting**.
+
+The basic idea is to require clients to request and acquire the permission of
+multiple servers before either reading or writing a replicated data item.
+
+When quorum-based replication was originally introduced, a somewhat
+more general scheme was proposed. In it, to read a file of which N replicas
+exist, a client needs to assemble a **read quorum**, an arbitrary collection of any
+NR servers, or more. Similarly, to modify a file, a **write quorum** of at least
+NW servers is required. The values of NR and NW are subject to the following
+two constraints:
+
+1. NR + NW > N
+2. NW > N/2
+
+The first constraint is used to prevent read-write conflicts, whereas the
+second prevents write-write conflicts. Only after the appropriate number of
+servers has agreed to participate can a file be read or written.
+
+### Cache-coherence protocols
+Caches form a special case of replication, in the sense that they are generally
+controlled by clients instead of servers. However, cache-coherence protocols,
+which ensure that a cache is consistent with the server-initiated replicas are,
+in principle, not very different from the consistency protocols discussed so far.
+
+There has been much research in the design and implementation of caches,
+especially in the context of shared-memory multiprocessor systems. Many
+solutions are based on support from the underlying hardware, for example,
+by assuming that snooping or efficient broadcasting can be done. In the
+context of middleware-based distributed systems that are built on top of
+general-purpose operating systems, software-based solutions to caches are
+more interesting. In this case, two separate criteria are often maintained to
+classify caching protocols.
+
+First, caching solutions may differ in their **coherence detection strategy**,
+that is, when inconsistencies are actually detected.
+
+### Implementing client-centric consistency
+For our last topic on consistency protocols, let us draw our attention to implementing
+client-centric consistency. Implementing client-centric consistency is
+relatively straightforward if performance issues are ignored.
+
+In a naive implementation of client-centric consistency, each write operation
+W is assigned a globally unique identifier. Such an identifier is assigned
+by the server to which the write had been submitted. We refer to this server
+as the origin of W. Then, for each client, we keep track of two sets of writes.
+The read set for a client consists of the writes relevant for the read operations
+performed by a client. Likewise, the write set consists of the (identifiers of
+the) writes performed by the client.
+
+## Summary
+There are primarily two reasons for replicating data: improving the reliability
+of a distributed system and improving performance. Replication introduces
+a consistency problem: whenever a replica is updated, that replica becomes
+different from the others. To keep replicas consistent, we need to propagate
+updates in such a way that temporary inconsistencies are not noticed. Unfortunately,
+doing so may severely degrade performance, especially in large-scale
+distributed systems.
+
+The only solution to this problem is to relax consistency somewhat. Different
+consistency models exist. For **continuous consistency**, the goal is to
+set bounds to numerical deviation between replicas, staleness deviation, and
+deviations in the ordering of operations.
+
+Numerical deviation refers to the value by which replicas may be different.
+This type of deviation is highly application dependent, but can, for example,
+be used in replication of stocks. Staleness deviation refers to the time by
+which a replica is still considered to be consistent, despite that updates may
+have taken place some time ago. Staleness deviation is often used for Web
+caches. Finally, ordering deviation refers to the maximum number of tentative
+writes that may be outstanding at any server without having synchronized
+with the other replica servers.
+
+**Consistent ordering of operations** has since long formed the basis for
+many consistency models. Many variations exist, but only a few seem to
+prevail among application developers. **Sequential consistency** essentially
+provides the semantics that programmers expect in concurrent programming:
+all write operations are seen by everyone in the same order. Less used,
+but still relevant, is **causal consistency**, which reflects that operations that
+are potentially dependent on each other are carried out in the order of that
+dependency.
+
+Weaker consistency models consider series of read and write operations.
+In particular, they assume that each series is appropriately “bracketed” by accompanying
+operations on synchronization variables, such as locks. Although
+this requires explicit effort from programmers, these models are generally
+easier to implement in an efficient way than, for example, pure sequential
+consistency.
+
+As opposed to these **data-centric models**, researchers in the field of distributed
+databases for mobile users have defined a number of **client-centric
+consistency models**. **Such models do not consider the fact that data may be
+shared by several users, but instead, concentrate on the consistency that an
+individual client should be offered**. The underlying assumption is that a client
+connects to different replicas in the course of time, but that such differences
+should be made transparent. In essence, client-centric consistency models
+ensure that whenever a client connects to a new replica, that replica is brought
+up to date with the data that had been manipulated by that client before, and
+which may possibly reside at other replica sites.
+
+To propagate updates, different techniques can be applied. A distinction
+needs to be made concerning **what** is exactly propagated, to **where** updates are
+propagated, and by **whom** propagation is initiated. We can decide to propagate
+notifications, operations, or state. Likewise, not every replica always needs to
+be updated immediately. Which replica is updated at which time depends
+on the distribution protocol. Finally, a choice can be made whether updates
+are pushed to other replicas, or that a replica pulls in updates from another
+replica.
+
+Consistency protocols describe specific implementations of consistency
+models. With respect to sequential consistency and its variants, a distinction
+can be made between primary-based protocols and replicated-write protocols.
+In primary-based protocols, all update operations are forwarded to a primary
+copy that subsequently ensures the update is properly ordered and forwarded.
+In replicated-write protocols, an update is forwarded to several replicas at the
+same time. In that case, correctly ordering operations often becomes more
+difficult.
