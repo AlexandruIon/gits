@@ -78,3 +78,9 @@ complexity roughly means that the algorithm is efficient.
 ![Summary of common order-of-growth hypotheses](../misc/algorithms/c1/fig1.common_order_of_growth_hypotheses.PNG)
 
 ![Typical orders of growth](../misc/algorithms/c1/fig1.typical_orders_of_growth.PNG)
+
+# Sorting
+
+## Elementary Sorts
+
+### ShellSort

@@ -1097,8 +1097,12 @@ a Callable.
 
 Runnable and Callable describe abstract computational tasks. Tasks are usually
 finite: they have a clear starting point and they eventually terminate. The
-lifecycle of a task executed by an Executor has four phases: created, submitted,
-started, and completed. Since tasks can take a long time to run, we also want to be
+lifecycle of a task executed by an Executor has four phases:
+created,
+submitted,
+started,
+and completed.
+Since tasks can take a long time to run, we also want to be
 able to cancel a task. In the Executor framework, tasks that have been submitted
 but not yet started can always be cancelled, and tasks that have started can sometimes
 be cancelled if they are responsive to interruption. Cancelling a task that

@@ -2936,3 +2936,309 @@ copy that subsequently ensures the update is properly ordered and forwarded.
 In replicated-write protocols, an update is forwarded to several replicas at the
 same time. In that case, correctly ordering operations often becomes more
 difficult.
+
+# Fault Tolerance
+A characteristic feature of distributed systems that distinguishes them from
+single-machine systems is the notion of partial failure: part of the system is
+failing while the remaining part continues to operate, and seemingly correctly.
+
+process resilience through process groups
+
+Achieving fault tolerance and reliable communication are strongly related.
+Next to reliable client-server communication we pay attention to reliable
+group communication and notably atomic multicasting.
+In the latter case, a
+message is delivered to all nonfaulty processes in a group, or to none at all.
+Having atomic multicasting makes development of fault-tolerant solutions
+much easier.
+
+Atomicity is a property that is important in many applications. In this
+chapter, we pay attention to what are known as distributed commit protocols
+by which a group of processes are conducted to either jointly commit their
+local work, or collectively abort and return to a previous system state.
+
+## Introduction to fault tolerance
+The key technique for handling failures is redundancy, which is also discussed.
+
+### Basic concepts
+Being fault tolerant is strongly related to what are called **dependable
+systems**. Dependability is a term that covers a number of useful requirements
+for distributed systems including the following:
+
+* Availability
+* Reliability
+* Safety
+* Maintainability
+
+**Availability** is defined as the property that a system is ready to be used
+immediately. In general, it refers to the probability that the system is operating
+correctly at any given moment and is available to perform its functions on
+behalf of its users. In other words, a highly available system is one that will
+most likely be working at a given instant in time.
+
+**Reliability** refers to the property that a system can run continuously
+without failure. In contrast to availability, reliability is defined in terms of a
+time interval instead of an instant in time. A highly reliable system is one
+that will most likely continue to work without interruption during a relatively
+long period of time. This is a subtle but important difference when compared
+to availability. If a system goes down on average for one, seemingly random
+millisecond every hour, it has an availability of more than 99.9999 percent,
+but is still unreliable. Similarly, a system that never crashes but is shut down
+for two specific weeks every August has high reliability but only 96 percent
+availability. The two are not the same.
+
+**Safety** refers to the situation that when a system temporarily fails to
+operate correctly, no catastrophic event happens.
+
+Finally, **maintainability** refers to how easily a failed system can be repaired.
+A highly maintainable system may also show a high degree of
+availability, especially if failures can be detected and repaired automatically.
+
+A system is said to **fail** when it cannot meet its promises.
+
+An **error** is a part of a system’s state that may lead to a failure.
+
+The cause of an error is called a **fault**.
+
+**Building dependable systems closely relates to controlling faults.**
+
+A distinction can be made between **preventing**, **tolerating**, **removing**, and **forecasting** **faults**.
+
+For our purposes, the most important issue is **fault tolerance**, meaning that a system can provide
+its services even in the presence of faults. For example, by applying error correcting
+codes for transmitting packets, it is possible to **tolerate**, to a certain
+extent, relatively poor transmission lines and reducing the probability that an
+error (a damaged packet) may lead to a failure.
+
+Faults are generally classified as:
+* Transient faults - occur once and then disappear. If the operation is repeated the fault goes away
+* Intermittent faults occurs, then vanishes of its own accord, then reapears and so on.(loose contact)
+* Permanent fault is one that contineus to exist until the faulty component is replaced
+
+### Failure modes
+![Types of failure](../misc/distributed_systems/c8/fig8.2_types_of_failure.PNG)
+
+The most serious are **arbitrary failures**, also known as **Byzantine failures**.
+
+We need to make a distinction between two types of distributed systems:
+
+* In an **asynchronous system**, no assumptions about process execution
+speeds or message delivery times are made. The consequence is that
+when process P no longer perceives any actions from Q, it cannot
+conclude that Q crashed. Instead, it may just be slow or its messages
+may have been lost.
+* In a **synchronous system**, process execution speeds and message-delivery
+times are bounded. This also means that when Q shows no more activity
+when it is expected to do so, process P can rightfully conclude that Q
+has crashed.
+
+Unfortunately, **pure synchronous systems** exist only in theory. On the other
+hand, simply stating that every distributed system is asynchronous also does
+not do just to what we see in practice and we would be overly pessimistic in
+designing distributed systems under the assumption that they are necessarily
+asynchronous. Instead, it is more realistic to assume that a distributed system
+is **partially synchronous**: most of the time it behaves as a synchronous system,
+yet there is no bound on the time that it behaves in an asynchronous fashion.
+In other words, **asynchronous behavior is an exception**, meaning that we can
+normally **use timeouts** to conclude that a process has indeed crashed, but that
+occasionally such a conclusion is false. In practice, this means that we will
+**have to design fault-tolerant solutions that can withstand incorrectly detecting
+that a process halted**.
+
+### Failure masking by redundancy
+If a system is to be fault tolerant, the best it can do is to try to hide the
+occurrence of failures from other processes. The key technique for masking
+faults is to use redundancy:
+
+* **information redundancy**, extra bits are added to allow recovery from garbled
+bits. For example, a Hamming code can be added to transmitted data to recover from noise on the transmission line.
+* **time redundancy**, an action is performed, and then, if need be, it is   performed again. Transactions use this approach. If a transaction aborts, it
+can be redone with no harm. Another well-known example is retransmitting  a request to a server when lacking an expected response. Time redundancy is
+especially helpful when the faults are transient or intermittent.
+* **physical redundancy**, extra equipment or processes are added to make it possible for the system as a whole to tolerate the loss or malfunctioning
+of some components. Physical redundancy can thus be done either in hardware or in software. For example, extra processes can be added to the
+system so that if a small number of them crash, the system can still function  correctly. In other words, by replicating processes, a high degree of fault
+tolerance may be achieved.
+
+## Process resilience
+The first topic we discuss is protection against process failures,
+which is achieved by **replicating processes into groups**. In the following pages,
+we consider the general design issues of process groups and discuss what
+a **fault-tolerant group** actually is. Also, we look at how to reach consensus
+within a process group when one or more of its members cannot be trusted to
+give correct answers.
+
+### Resilience by process groups
+The key approach to tolerating a faulty process is to organize several identical
+processes into a group. The key property that all groups have is that when a
+message is sent to the group itself, all members of the group receive it. In this
+way, if one process in a group fails, hopefully some other process can take
+over for it.
+
+Process groups may be dynamic. New groups can be created and old
+groups can be destroyed. A process can join a group or leave one during
+system operation. A process can be a member of several groups at the same
+time. Consequently, mechanisms are needed for **managing groups** and **group
+membership**.
+
+The purpose of introducing groups is to allow a process to deal with
+collections of other processes as a single abstraction. Thus a process P can
+send a message to a group Q = fQ1, . . . ,QNg of servers without having to
+know who they are, how many there are, or where they are, which may
+change from one call to the next. To P, the group Q appears to be a single,
+logical process.
+
+#### Group organization
+An important distinction between different groups has to do with their internal
+structure. In some groups, all processes are equal. There is no distinctive
+leader and all decisions are made collectively. In other groups, some kind
+of hierarchy exists. For example, one process is the coordinator and all the
+others are workers. In this model, when a request for work is generated, either
+by an external client or by one of the workers, it is sent to the coordinator.
+The coordinator then decides which worker is best suited to carry it out, and
+forwards it there. More complex hierarchies are also possible, of course.
+
+![Types of group communicaiton](../misc/distributed_systems/c8/fig8.4_communication_in_group.PNG)
+
+Each of these organizations has its own advantages and disadvantages.
+The flat group is symmetrical and has no single point of failure. If one of
+the processes crashes, the group simply becomes smaller, but can otherwise
+continue. A disadvantage is that decision making is more complicated. For
+example, to decide anything, a vote often has to be taken, incurring some
+delay and overhead.
+
+The hierarchical group has the opposite properties. Loss of the coordinator
+brings the entire group to a grinding halt, but as long as it is running, it
+can make decisions without bothering everyone else. In practice, when the
+coordinator in a hierarchical group fails, its role will need to be taken over and
+one of the workers is elected as new coordinator.
+
+#### Membership management
+When group communication is present, some method is needed for creating
+and deleting groups, as well as for allowing processes to join and leave groups.
+One possible approach is to have a **group server** to which all these requests
+can be sent. The group server can then maintain a complete database of all the
+groups and their exact membership. This method is straightforward, efficient,
+and fairly easy to implement. Unfortunately, it shares a major disadvantage
+with all centralized techniques: a single point of failure. If the group server
+crashes, group management ceases to exist. Probably most or all groups will
+have to be reconstructed from scratch, possibly terminating whatever work
+was going on.
+
+The opposite approach is to manage group membership in a distributed
+way. For example, **if (reliable) multicasting is available**, an outsider can send a
+message to all group members announcing its wish to join the group.
+
+Ideally, to leave a group, a member just sends a goodbye message to
+everyone. In the context of fault tolerance, assuming fail-stop failure semantics
+is generally not appropriate. The trouble is, there is no polite announcement
+that a process crashes as there is when a process leaves voluntarily. The other
+members have to discover this experimentally by noticing that the crashed
+member no longer responds to anything. Once it is certain that the crashed
+member is really down (and not just slow), it can be removed from the group.
+
+Another knotty issue is that leaving and joining have to be synchronous
+with data messages being sent. In other words, starting at the instant that a
+process has joined a group, it must receive all messages sent to that group.
+Similarly, as soon as a process has left a group, it must not receive any more
+messages from the group, and the other members must not receive any more
+messages from it.
+
+One final issue relating to group membership is what to do if so many
+processes go down that the group can no longer function at all. Some protocol
+is needed to rebuild the group. Invariably, some process will have to take
+the initiative to start the ball rolling, but what happens if two or three try
+at the same time?
+
+### Failure masking and replication
+
+Process groups are part of the solution for building fault-tolerant systems.
+In particular, having a group of identical processes allows us to mask one
+or more faulty processes in that group. In other words, we can **replicate
+processes and organize them into a group to replace a single (vulnerable)
+process with a (fault tolerant) group**. As discussed in the previous chapter,
+there are two ways to approach such replication: by means of primary-based
+protocols, or through replicated-write protocols.
+
+Primary-based replication in the case of fault tolerance generally appears
+in the form of a primary-backup protocol. In this case, a group of processes is
+organized in a hierarchical fashion in which a primary coordinates all write
+operations. In practice, the primary is fixed, although its role can be taken
+over by one of the backups, if need be. In effect, when the primary crashes,
+the backups execute some election algorithm to choose a new primary.
+
+Replicated-write protocols are used in the form of active replication, as
+well as by means of quorum-based protocols. These solutions correspond
+to organizing a collection of identical processes into a flat group. The main
+advantage is that such groups have no single point of failure at the cost of
+distributed coordination.
+
+### Consensus in faulty systems with crash failures
+As mentioned, in terms of clients and servers, we have adopted a model in
+which a potentially very large collection of clients now send commands to a
+**group of processes** that jointly behave as a **single, highly robust process**. To make
+this work, we need to make an important assumption:
+
+```
+In a fault-tolerant process group, each nonfaulty process executes the
+same commands, in the same order, as every other nonfaulty process.
+```
+
+Formally, this means that the **group members need to reach consensus** on
+which command to execute. **If failures cannot happen, reaching consensus
+is easy**. For example, we can use **Lamport’s totally ordered multicasting** as
+described in Section 6.2. Or, to keep it simple, using a **centralized sequencer**
+that hands out a sequence number to each command that needs to be executed
+will do the job as well.
+
+To illustrate the problem at hand, let us assume we have a group of
+processes P = fP1, . . . , Png operating **under fail-stop failure semantics**. In
+other words, we assume that crash failures can be reliably detected among
+the group members. Typically a client contacts a group member requesting
+it to execute a command. **Every group member maintains a list of proposed
+commands**: some which it received directly from clients; others which it
+received from its fellow group members. We can reach consensus using the
+following approach, adopted from Cachin et al. [2011], and referred to as
+**flooding consensus**.
+
+Conceptually the algorithm **operates in rounds**. In each round, a process Pi
+sends its list of proposed commands it has seen so far to every other process
+in **P**. At the end of a round, **each process merges all received proposed
+commands into a new list**, from which it then will deterministically select the
+command to execute, if possible. It is important to realize that the selection
+algorithm is the same for all processes. In other words, if all process have
+exactly the same list, they will all select the same command to execute (and
+remove that command from their list).
+
+It is not difficult to see that this approach works as long as processes do
+not fail. Problems start when a process Pi detects, during round r, that, say
+process Pk has crashed.
+
+![Consensus flooding](../misc/distributed_systems/c8/fig8.15_consensus_flooding.PNG)
+
+A process will decide to move to a next round when it has received a message from every nonfaulty process. This assumes that each process can reliably detect the
+crashing of another process, for otherwise it would not be able to decide who the nonfaulty processes are.
+
+To understand why this algorithm is correct, it is important to realize that
+a process will move to a next round without having made a decision, only
+when it detects that another process has failed. In the end, this means that **in
+the worst case at most one nonfaulty process remains, and this process can
+simply decide whatever proposed command to execute**. Again, note that we
+are assuming reliable failure detection.
+
+### Example: Paxos
+The flooding-based consensus algorithm is not very realistic if only for the
+fact that it relies on a **fail-stop failure model**. More realistic is to assume
+a **fail-noisy failure model** in which a process will **eventually** reliably detect
+that another process has crashed.
+
+The algorithm operates as a network of **logical** processes, of which there are different types:
+* clients - request a specific operation to be executed
+* proposer - (at server side) attempts to have a client's request accepted. Normally, a single proposer has been designated as being the leader, and drives the protocol toward reaching consensus.
+* acceptor - a proposed operation is accepted by an "acceptor".
+* learner - will execute a chosen proposal once it has been informed by a majority of acceptors
+
+It is important to note that a single proposer, acceptor, and learner form a
+single **physical** process, running on a single machine that the client communicates with.
+
+![Paxos](../misc/distributed_systems/c8/fig8.8_paxos_logical_processes.PNG)
